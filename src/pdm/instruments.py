@@ -19,7 +19,12 @@ def factory_instruments() -> list[Instrument]:
             purpose="Flag unresolved infection concern from WBC trajectory, procalcitonin trend, cultures, and vitals.",
             inputs=["labs.wbc_current", "labs.wbc_48h_delta", "labs.procalcitonin_trend", "labs.cultures_pending", "vitals.afebrile_hours"],
             validation_checks=["borderline values force clinician review", "culture-pending state preserved", "rising inflammatory markers increase risk"],
-            limitations=["Rule-based demo", "No antimicrobial recommendation", "No replacement for infectious disease review"],
+            limitations=[
+                "Synthetic rule-based demo",
+                "Not clinically validated",
+                "No antimicrobial recommendation",
+                "No replacement for infectious disease review",
+            ],
         ),
         Instrument(
             name="environmental_medication_access_rules",
@@ -27,7 +32,11 @@ def factory_instruments() -> list[Instrument]:
             purpose="Represent non-clinical discharge risks that drive avoidable readmission.",
             inputs=["social.zip_code", "social.pharmacy_access_minutes", "social.caregiver_available", "meds.med_access_risk", "meds.adherence_concern"],
             validation_checks=["no protected-class inference", "explain each access-risk flag", "route high access risk to support planning"],
-            limitations=["Zip-code demo is a placeholder", "Requires vetted SDOH data and fairness review"],
+            limitations=[
+                "Synthetic zip-code placeholder",
+                "Not clinically validated",
+                "Requires vetted SDOH data and fairness review",
+            ],
         ),
     ]
 
@@ -119,4 +128,3 @@ def environmental_score(case: PatientCase) -> Score:
 
 def score_case(case: PatientCase) -> list[Score]:
     return [frailty_score(case), secondary_infection_score(case), environmental_score(case)]
-

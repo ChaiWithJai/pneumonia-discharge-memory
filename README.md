@@ -51,8 +51,11 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 pdm-run examples/patients/pneumonia_case_001.json --memory-dir examples/memory
+pdm-prove examples/patients/pneumonia_case_001.json --memory-dir examples/memory/proof
 pytest
 ```
+
+The proof command runs the public pneumonia use case against the finite-state HOMER-1 criteria and should report `11/11 criteria passed`. A captured proof artifact is checked in at `examples/pneumonia_case_001_homer1_proof.json`.
 
 ## Optional Local AI Integrations
 
@@ -75,11 +78,13 @@ src/pdm/
   runtime.py              Five-state runtime
   memory.py               Institutional memory store
   whatif.py               What-if scenario generation
+  proof.py                HOMER-1 finite-state proof harness
   local_ai.py             Optional local AI adapters
   cli.py                  Command-line entrypoint
 docs/
   ARCHITECTURE.md
   CLINICAL_SAFETY.md
+  FINITE_STATE_MACHINE.md
   FIELD_OPERATOR_MODEL.md
   HACKATHON_PLAYBOOK.md
   INSTITUTIONAL_MEMORY.md
@@ -104,4 +109,3 @@ The project is written as an open technical artifact, closer to a Linux Foundati
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE).
-

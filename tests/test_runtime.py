@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from pdm.memory import read_memory
+from pdm.proof import prove_case
 from pdm.runtime import run
 from pdm.schemas import PatientCase, RuntimeState
 
@@ -40,3 +41,31 @@ def test_memory_event_persists_future_reuse_targets(tmp_path):
     assert "frailty_index_calculator" in event["reusable_assets"]
     assert result.institutional_memory_event["domain"] == "pneumonia_discharge"
 
+
+def test_homer1_proof_covers_entire_runtime(tmp_path):
+    proof = prove_case(load_case(), memory_dir=tmp_path)
+    assert proof["passed"] is True
+    assert proof["criteria_passed"] == proof["criteria_total"]
+
+    criteria_by_id = {criterion["id"]: criterion for criterion in proof["criteria"]}
+    assert set(criteria_by_id) == {
+        "factory.generative-toolchain",
+        "factory.validation-declarations",
+        "plan.trace-decomposition",
+        "analyze.deterministic-probabilistic-fusion",
+        "analyze.recursive-validation-loop",
+        "simulate.whatif-operations",
+        "simulate.empathy-with-guardrails",
+        "output.decision-ready-human-handoff",
+        "persist.institutional-memory",
+        "governance.synthetic-safety-boundary",
+        "runtime.governed-state-order",
+    }
+    assert criteria_by_id["runtime.governed-state-order"]["evidence"] == [
+        "factory",
+        "plan",
+        "analyze",
+        "simulate",
+        "output",
+    ]
+    assert criteria_by_id["persist.institutional-memory"]["evidence"]["service_line"] == "pulmonary"

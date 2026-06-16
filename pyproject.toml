@@ -17,8 +17,8 @@ dev = ["pytest>=8.2"]
 
 [project.scripts]
 pdm-run = "pdm.cli:app"
+pdm-prove = "pdm.prove_cli:app"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
-
