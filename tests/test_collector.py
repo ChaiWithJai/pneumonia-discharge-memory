@@ -107,6 +107,34 @@ def test_conference_finalize_persists_and_exports(tmp_path):
     assert any(a["knowledge_layer"] == "overall" for a in bundle["alignment"])
 
 
+def test_insights_and_rule_suggestion(tmp_path):
+    from pdm.insights import insights, suggest_rule
+
+    memory = InstitutionalMemory(tmp_path)
+    case = load_case()
+    session = start_session("sess-i", [case.patient_id])
+    runtime = present(case, memory)
+    judgments = [
+        Judgment(step="analyze", pass_votes=2, fail_votes=6, note="cultures pending, pharmacy far"),
+        Judgment(step="simulate", pass_votes=7, fail_votes=1),
+        Judgment(step="output", pass_votes=8, fail_votes=0),
+    ]
+    finalize_case(memory, session, case, runtime, judgments, None)
+    memory.record_eval_cases(build_eval_cases(runtime, judgments, KnowledgeLayer.SERVICE_LINE))
+    memory.record_preferences(build_preference_pairs(runtime, judgments, None, KnowledgeLayer.SERVICE_LINE))
+
+    out = insights(memory, writer=None)  # offline
+    assert out["advisor"] is None
+    assert out["confusion"]["tp"] + out["confusion"]["fp"] + out["confusion"]["tn"] + out["confusion"]["fn"] == 1
+    assert out["recommendations"], "expected at least one recommendation"
+    assert all("principle" in r for r in out["recommendations"])
+    assert "Hamel" in out["canon"]
+
+    rule = suggest_rule(case, ["analyze"], writer=None)
+    assert rule["source"] == "template"
+    assert "IF" in rule["text"]
+
+
 def test_prove_collector_end_to_end(tmp_path):
     from pdm.proof import prove_collector
 

@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { api } from "../api";
   import { conf } from "../store.svelte";
+  import Insights from "../Insights.svelte";
   import type { Bundle } from "../types";
 
   let bundle = $state<Bundle | null>(null);
@@ -42,8 +43,11 @@
     </div>
 
     <div class="card pad rise rise-3" style="margin-top:22px">
-      <div class="sec-title">Judge alignment across the knowledge chain</div>
-      <p class="sec-lead">Tool vs. the room (TPR/TNR), and both against the data-lake outcome. A 100% pass rate would mean the cases were too easy.</p>
+      <Insights />
+    </div>
+
+    <details class="card pad rise rise-3" style="margin-top:14px">
+      <summary>Judge alignment across the knowledge chain</summary>
       <table>
         <thead><tr><th>layer</th><th>n</th><th>TPR</th><th>TNR</th><th>room·truth</th><th>tool·truth</th></tr></thead>
         <tbody>
@@ -52,7 +56,7 @@
           {/each}
         </tbody>
       </table>
-    </div>
+    </details>
 
     <div class="downloads rise rise-4">
       <span class="label">Export bundle</span>
@@ -74,6 +78,8 @@
   @media (max-width: 760px) { .stats { grid-template-columns: repeat(2, 1fr); } }
   .stat .v { font-family: var(--serif); font-size: 32px; line-height: 1; color: var(--gold); }
   .stat .label { margin-top: 8px; }
+  summary { cursor: pointer; font-family: var(--serif); font-size: 15px; color: var(--dim); }
+  summary:hover { color: var(--paper); }
   table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 12.5px; }
   th { text-align: left; font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--faint); padding: 6px 8px; }
   td { padding: 8px 8px; border-top: 1px solid var(--line); color: var(--dim); }

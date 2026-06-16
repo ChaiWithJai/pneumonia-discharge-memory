@@ -32,6 +32,8 @@ import typer
 
 from .evals import axial_taxonomy, build_eval_cases, build_preference_pairs
 from .export import build_bundle
+from .insights import insights as build_insights
+from .insights import suggest_rule
 from .local_ai import SYSTEM_NARRATION, BonsaiImageStudio, BonsaiWriter
 from .memory import InstitutionalMemory
 from .proof import prove_case, prove_cohort
@@ -133,6 +135,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(reconcile(case_id).model_dump(mode="json"))
             elif path == "/api/conference/summary" or path == "/api/export/bundle":
                 self._json(build_bundle(InstitutionalMemory(RUNTIME_MEMORY)))
+            elif path == "/api/insights":
+                self._json(build_insights(InstitutionalMemory(RUNTIME_MEMORY), writer=WRITER))
             elif path.startswith("/assets/"):
                 self._serve_asset(path)
             else:
@@ -151,6 +155,10 @@ class Handler(BaseHTTPRequestHandler):
                 self._narrate()
             elif url.path == "/api/conference/finalize":
                 self._finalize()
+            elif url.path == "/api/conference/suggest-rule":
+                body = self._body()
+                case = _load_case(body.get("case", "pneumonia_case_001.json"))
+                self._json(suggest_rule(case, body.get("failed_steps", []), writer=WRITER))
             else:
                 self._json({"error": "not found"}, HTTPStatus.NOT_FOUND)
         except Exception as exc:  # pragma: no cover
