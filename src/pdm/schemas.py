@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 
 class RuntimeState(str, Enum):
@@ -185,4 +185,118 @@ class RuntimeResult(BaseModel):
     scenarios: list[WhatIfScenario]
     handoff: HandoffRecommendation
     institutional_memory_event: dict[str, Any]
+
+
+# --- Institutional Knowledge Collector -----------------------------------------
+#
+# Types for the facilitated case-conference: the room judges the runtime's trace,
+# the judgments reconcile against a mocked data lake, and everything compounds into
+# institutional memory + exportable evals/preference data, tagged across a
+# four-layer knowledge chain.
+
+
+class KnowledgeLayer(str, Enum):
+    ORGANIZATIONAL = "organizational"
+    DOMAIN = "domain"
+    SERVICE_LINE = "service_line"
+    PATIENT = "patient"
+
+
+JudgedStep = Literal["analyze", "simulate", "output"]
+
+
+class Outcome(BaseModel):
+    """A label from the (mocked) data lake — the bridge to the data team."""
+
+    patient_id: str
+    readmitted_30d: bool
+    days_to_readmit: int | None = None
+    length_of_stay_days: int = Field(ge=0)
+    followup_kept: bool = False
+    source: str = "mock_data_lake"
+
+
+class Judgment(BaseModel):
+    """The room's binary verdict on one trace step (facilitator-entered tally)."""
+
+    step: JudgedStep
+    pass_votes: int = Field(ge=0)
+    fail_votes: int = Field(ge=0)
+    note: str = ""
+    leader_override: Literal["pass", "fail"] | None = None
+
+    @computed_field
+    @property
+    def consensus(self) -> Literal["pass", "fail"]:
+        if self.leader_override is not None:
+            return self.leader_override
+        return "pass" if self.pass_votes >= self.fail_votes else "fail"
+
+    @computed_field
+    @property
+    def split(self) -> str:
+        return f"{self.pass_votes}-{self.fail_votes}"
+
+    @computed_field
+    @property
+    def contested(self) -> bool:
+        total = self.pass_votes + self.fail_votes
+        return total > 0 and min(self.pass_votes, self.fail_votes) / total >= 0.34
+
+
+class Lesson(BaseModel):
+    text: str
+    knowledge_layer: KnowledgeLayer
+    source_case_id: str
+    author_role: str = "service_line_leader"
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class EvalCase(BaseModel):
+    id: str
+    source_case_id: str
+    step: JudgedStep
+    prompt: str
+    expected: Literal["pass", "fail"]
+    knowledge_layer: KnowledgeLayer
+    rationale: str = ""
+
+
+class PreferencePair(BaseModel):
+    prompt: str
+    chosen: str
+    rejected: str
+    knowledge_layer: KnowledgeLayer
+    source_case_id: str
+
+
+class JudgeAlignment(BaseModel):
+    knowledge_layer: str
+    n: int
+    tpr: float
+    tnr: float
+    room_vs_outcome_agreement: float
+    tool_vs_outcome_agreement: float
+
+
+class CaseStudy(BaseModel):
+    source_case_id: str
+    hero_image_seed: int
+    vignette: str
+    scenario_narrations: list[str]
+    verdict_summary: str
+    outcome: Outcome | None
+    lesson: Lesson | None
+    knowledge_layer: KnowledgeLayer
+
+
+class Session(BaseModel):
+    id: str
+    facilitator: str = "service_line_leader"
+    case_ids: list[str] = Field(default_factory=list)
+    active_case_id: str | None = None
+    judgments: dict[str, list[Judgment]] = Field(default_factory=dict)  # keyed by case_id
+    lessons: list[Lesson] = Field(default_factory=list)
+    status: Literal["open", "closed"] = "open"
+    started_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 

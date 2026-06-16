@@ -21,7 +21,7 @@ from typing import Any
 from .factory import compile_tool
 from .memory import InstitutionalMemory
 from .runtime import run
-from .schemas import PatientCase, RuntimeResult, RuntimeState
+from .schemas import Judgment, KnowledgeLayer, Lesson, PatientCase, RuntimeResult, RuntimeState
 
 
 @dataclass(frozen=True)
@@ -290,4 +290,73 @@ def prove_cohort(cases: list[PatientCase], memory_dir: Path) -> dict[str, Any]:
         "dispositions": dispositions,
         "criteria": payload,
         "results": {pid: by_id[pid].model_dump(mode="json") for pid in by_id},
+    }
+
+
+def prove_collector(cases_with_scripts: list[tuple[PatientCase, list[Judgment], Lesson | None]], memory_dir: Path) -> dict[str, Any]:
+    """Prove the institutional-knowledge collector end to end.
+
+    Runs a scripted multi-case conference sharing one memory and proves the
+    payoff: a binary eval suite is produced, preference pairs are emitted where
+    the room overturns the tool, alignment is computed per layer, and durable
+    teaching artifacts persist.
+    """
+    from .evals import build_eval_cases, build_preference_pairs
+    from .export import build_bundle
+    from .session import finalize_case, present, start_session
+
+    memory = InstitutionalMemory(memory_dir)
+    session = start_session("proof-session", [c.patient_id for c, _, _ in cases_with_scripts])
+
+    overturns = 0
+    for case, judgments, lesson in cases_with_scripts:
+        runtime = present(case, memory)
+        finalize_case(memory, session, case, runtime, judgments, lesson, KnowledgeLayer.SERVICE_LINE)
+        memory.record_eval_cases(build_eval_cases(runtime, judgments, KnowledgeLayer.SERVICE_LINE))
+        prefs = build_preference_pairs(runtime, judgments, lesson, KnowledgeLayer.SERVICE_LINE)
+        memory.record_preferences(prefs)
+        overturns += sum(1 for j in judgments if j.consensus == "fail")
+
+    bundle = build_bundle(memory)
+    alignment = {a["knowledge_layer"]: a for a in bundle["alignment"]}
+
+    criteria = [
+        _c("collector.binary-eval-suite", "evals",
+           "The conference produces a binary eval suite (one case per judged step).",
+           "memory/evals.jsonl",
+           bundle["counts"]["eval_cases"] == 3 * len(cases_with_scripts),
+           bundle["counts"]),
+        _c("collector.preference-on-overturn", "evals",
+           "Preference pairs are emitted wherever the room overturns the tool.",
+           "memory/preferences.jsonl",
+           bundle["counts"]["preference_pairs"] >= overturns and overturns > 0,
+           {"preference_pairs": bundle["counts"]["preference_pairs"], "overturns": overturns}),
+        _c("collector.judge-alignment", "evals",
+           "Judge alignment (TPR/TNR + outcome agreement) is computed, with an overall roll-up.",
+           "alignment[*]",
+           "overall" in alignment and alignment["overall"]["n"] == len(cases_with_scripts),
+           alignment.get("overall")),
+        _c("collector.durable-artifacts", "persist",
+           "Durable teaching artifacts (lessons, case studies) persist to institutional memory.",
+           "memory/lessons.jsonl + case_studies.jsonl",
+           bundle["counts"]["lessons"] >= 1 and bundle["counts"]["case_studies"] == len(cases_with_scripts),
+           bundle["counts"]),
+        _c("collector.knowledge-chain-tagged", "governance",
+           "Every exported artifact is tagged to a knowledge-chain layer.",
+           "eval_suite_jsonl",
+           all('"knowledge_layer"' in line for line in bundle["eval_suite_jsonl"].splitlines() if line.strip()),
+           {"sample": bundle["eval_suite_jsonl"].splitlines()[:1]}),
+    ]
+
+    payload = [
+        {"id": c.id, "state": c.state, "claim": c.claim, "evidence_path": c.evidence_path, "passed": c.passed, "evidence": c.evidence}
+        for c in criteria
+    ]
+    return {
+        "passed": all(c.passed for c in criteria),
+        "criteria_passed": sum(1 for c in criteria if c.passed),
+        "criteria_total": len(criteria),
+        "criteria": payload,
+        "bundle_counts": bundle["counts"],
+        "alignment": bundle["alignment"],
     }
