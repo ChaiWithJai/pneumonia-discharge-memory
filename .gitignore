@@ -3,9 +3,10 @@ node_modules/
 __pycache__/
 *.pyc
 .pytest_cache/
-dist/
+/dist/
 build/
 *.egg-info/
+# app/dist is committed so `pdm-web` runs without a Node toolchain (rebuild: npm run build)
 examples/memory/*.jsonl
 examples/memory/web/
 examples/memory/web_runtime/
@@ -13,5 +14,4 @@ examples/memory/institutional/
 examples/memory/proof/
 outputs/
 .playwright-mcp/
-package-lock.json
-node_modules/
+.superpowers/

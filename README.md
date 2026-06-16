@@ -7,11 +7,35 @@ This is an open-source reference implementation of a HOMER-1-inspired runtime: i
 from raw chart context to a transparent, auditable, **human-signed** handoff, and it accumulates *institutional
 memory* so the next case — and the next pulmonary use case — costs less to launch and is safer to inspect.
 
-![The studio](docs/assets/studio.png)
+![The case conference](docs/assets/conference/s3-feel.png)
 
-*The studio after one run: the governed pipeline, the Factory's generated instruments, banded risk scores, the
-recursive validation loop, a mandatory human handoff — and three discharge what-ifs, each illustrated on-device by
-Bonsai Image so the decision is empathetic, not just numeric.*
+*The case conference, "Feel" stage: three discharge what-ifs, each illustrated on-device by Bonsai Image so the
+room sees the patient, not a score. The interface is a Svelte/TypeScript app whose accent temperature shifts with
+the room's emotion across nine states.*
+
+---
+
+## The case conference (institutional knowledge collector)
+
+The headline experience is a **facilitated case conference**: a service-line leader walks the room (nurses, case
+managers, pharmacists) through one discharge at a time. Their judgment compounds into institutional memory **and**
+exports as Hamel-grade evals + DPO-ready preference data — bridging the care team and the data team. Nine states,
+one emotional arc:
+
+| | | |
+|---|---|---|
+| **Present** — the scored handoff | **Feel** — Bonsai what-ifs | **Judge** — binary tally vote |
+| ![](docs/assets/conference/s2-present.png) | ![](docs/assets/conference/s4-judge.png) | ![](docs/assets/conference/s5-reckon.png) |
+| **Reckon** — the data-lake reveal | **Compound** — the payoff | **Summary** — the export bundle |
+| ![](docs/assets/conference/s5-reckon.png) | ![](docs/assets/conference/s7-compound.png) | ![](docs/assets/conference/s8-summary.png) |
+
+Flow: **Present** (the runtime's scored trace) → **Feel** (three illustrated discharge paths) → **Judge** (the room
+votes pass/fail on the three clinically-weighted steps) → **Reckon** (the mocked data-lake outcome — were the room
+and the tool right?) → **Decide** (the leader records one reusable rule) → **Compound** (memory + eval cases + RLHF
+pairs + the acceleration curve) → loop, then **Summary** (download the bundle). Methodology follows
+[Hamel Husain's evals](https://hamel.dev/blog/posts/evals-faq/): binary not Likert, open→axial failure taxonomy,
+and TPR/TNR judge alignment reported per knowledge layer (organizational → domain → service-line → patient). See
+[the design spec](docs/superpowers/specs/2026-06-15-institutional-knowledge-collector-design.md).
 
 ---
 
@@ -71,11 +95,14 @@ pdm-run examples/patients/pneumonia_case_001.json --memory-dir /tmp/pdm-mem   # 
 pdm-prove examples/patients/pneumonia_case_001.json          # 12/12 criteria
 pdm-prove examples/patients/pneumonia_case_001.json --cohort # differentiated routing across 3 cases
 
-# 3) Launch the studio (single self-contained page + stdlib proxy)
-pdm-web                       # http://127.0.0.1:8765
+# 3) Launch the case conference (Svelte app served by the stdlib proxy)
+pdm-web                       # http://127.0.0.1:8765 — the built app is committed
 
 # 4) Tests
-pytest
+pytest                        # 20 backend tests
+
+# Rebuild the frontend after editing app/src (optional — dist is committed)
+cd app && npm install && npm run build
 ```
 
 The studio works fully **offline**: if the Bonsai servers are down, what-if frames fall back to a synchronously
@@ -99,20 +126,24 @@ A real on-device render is checked in at [`examples/assets/empathy_sample.png`](
 
 ```text
 src/pdm/
-  schemas.py     Typed clinical objects + generative-toolchain types (ToolSpec, GeneratedTool)
+  schemas.py     Typed clinical objects + generative-toolchain + collector types
   factory.py     Generative toolchain assembly: synthesize, validate, persist, reuse executable tools
-  memory.py      Institutional memory store (events + persisted tool artifacts)
   runtime.py     Five-state governed runtime + recursive validation loop
   whatif.py      What-if scenario + empathy-prompt generation
+  datalake.py    Mock data lake — deterministic outcomes (the care/data bridge)
+  session.py     Case-conference engine: present, tally judgments, reconcile, build case study
+  evals.py       Hamel-grade: binary eval cases, preference pairs, axial taxonomy, TPR/TNR alignment
+  export.py      Eval suite JSONL, DPO preference JSONL, case-study Markdown, download bundle
+  memory.py      Institutional memory store (tools, lessons, case studies, evals, preferences)
   local_ai.py    Bonsai writer + image studio adapters (offline-first)
-  proof.py       Single-case + cohort proof harness (generative, stateful, differentiated)
-  web.py         Stdlib studio server: API + same-origin image/narration proxy
+  proof.py       Proof harness: generative/stateful/differentiated + collector end-to-end
+  web.py         Stdlib server: conference API + same-origin image/narration proxy + serves app/dist
   cli.py         pdm-run / prove_cli.py: pdm-prove
-web/index.html   The studio - one self-contained page, no build step
-docs/            ARCHITECTURE, RESEARCH (cited), CLINICAL_SAFETY, INSTITUTIONAL_MEMORY, FINITE_STATE_MACHINE,
-                 WHATIF_EMPATHY, FIELD_OPERATOR_MODEL, HACKATHON_PLAYBOOK, ROADMAP
-examples/        patients/ (synthetic cohort), assets/ (sample render), pneumonia_case_001_homer1_proof.json
-tests/           runtime, factory unit, HOMER-1 acceptance + cohort
+app/             Svelte 5 + TypeScript + Vite case-conference UI (9 states); app/dist is committed
+web/index.html   Legacy single-file studio (fallback when app/dist is absent)
+docs/            ARCHITECTURE, RESEARCH (cited), superpowers/specs/ (design spec), assets/
+examples/        patients/ (synthetic cohort), assets/ (sample render), homer1 proof artifact
+tests/           runtime, factory unit, HOMER-1 acceptance + cohort, collector
 ```
 
 ## Extending it

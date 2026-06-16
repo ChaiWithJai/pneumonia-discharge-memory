@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .schemas import GeneratedTool, ToolSpec
+from .schemas import CaseStudy, EvalCase, GeneratedTool, Lesson, PreferencePair, ToolSpec
 
 
 class InstitutionalMemory:
@@ -104,8 +104,51 @@ class InstitutionalMemory:
     def record_case(self, event: dict[str, Any]) -> None:
         self._append(event)
 
+    def record_event(self, event: dict[str, Any]) -> None:
+        self._append(event)
+
     def cumulative_steps_saved(self) -> int:
         return sum(1 for e in self.events() if e.get("type") == "tool_reused")
+
+    # --- collector artifacts (lessons, case studies, evals, preferences) -------
+    def _append_jsonl(self, name: str, obj: Any) -> Path:
+        self.ensure()
+        path = self.root / name
+        with path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(obj, sort_keys=True) + "\n")
+        return path
+
+    def _read_jsonl(self, name: str) -> list[dict[str, Any]]:
+        path = self.root / name
+        if not path.exists():
+            return []
+        return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+    def record_lesson(self, lesson: Lesson) -> None:
+        self._append_jsonl("lessons.jsonl", lesson.model_dump(mode="json"))
+
+    def load_lessons(self) -> list[dict[str, Any]]:
+        return self._read_jsonl("lessons.jsonl")
+
+    def record_case_study(self, study: CaseStudy) -> None:
+        self._append_jsonl("case_studies.jsonl", study.model_dump(mode="json"))
+
+    def load_case_studies(self) -> list[dict[str, Any]]:
+        return self._read_jsonl("case_studies.jsonl")
+
+    def record_eval_cases(self, cases: list[EvalCase]) -> None:
+        for case in cases:
+            self._append_jsonl("evals.jsonl", case.model_dump(mode="json"))
+
+    def load_eval_cases(self) -> list[dict[str, Any]]:
+        return self._read_jsonl("evals.jsonl")
+
+    def record_preferences(self, pairs: list[PreferencePair]) -> None:
+        for pair in pairs:
+            self._append_jsonl("preferences.jsonl", pair.model_dump(mode="json"))
+
+    def load_preferences(self) -> list[dict[str, Any]]:
+        return self._read_jsonl("preferences.jsonl")
 
 
 def case_event(case_id: str, run_index: int, service_line: str, artifacts: dict[str, Any]) -> dict[str, Any]:

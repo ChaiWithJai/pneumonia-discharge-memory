@@ -30,15 +30,22 @@ from urllib.parse import parse_qs, urlparse
 
 import typer
 
+from .evals import axial_taxonomy, build_eval_cases, build_preference_pairs
+from .export import build_bundle
 from .local_ai import SYSTEM_NARRATION, BonsaiImageStudio, BonsaiWriter
 from .memory import InstitutionalMemory
 from .proof import prove_case, prove_cohort
 from .runtime import run
-from .schemas import PatientCase
+from .schemas import Judgment, KnowledgeLayer, Lesson, PatientCase
+from .session import finalize_case, hero_seed, present, reconcile, start_session, vignette_for
 
 ROOT = Path(__file__).resolve().parents[2]
-PAGE = ROOT / "web" / "index.html"
+APP_DIST = ROOT / "app" / "dist"          # built Svelte conference app (preferred)
+LEGACY_PAGE = ROOT / "web" / "index.html"  # single-file studio (fallback)
 PATIENTS = ROOT / "examples" / "patients"
+
+_CONTENT_TYPES = {".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml",
+                  ".ico": "image/x-icon", ".json": "application/json", ".woff2": "font/woff2"}
 RUNTIME_MEMORY = ROOT / "examples" / "memory" / "web_runtime"
 
 WRITER = BonsaiWriter(os.environ.get("BONSAI_WRITER_URL", "http://127.0.0.1:8080"))
@@ -111,6 +118,23 @@ class Handler(BaseHTTPRequestHandler):
                     self._json(prove_cohort(cases, memory_dir=Path(tmp)))
             elif path == "/api/memory":
                 self._json(self._memory_state())
+            elif path == "/api/conference/present":
+                case = _load_case(query.get("case", ["pneumonia_case_001.json"])[0])
+                runtime = present(case, InstitutionalMemory(RUNTIME_MEMORY))
+                self._json(
+                    {
+                        "runtime": runtime.model_dump(mode="json"),
+                        "hero_seed": hero_seed(case.patient_id),
+                        "vignette": vignette_for(case),
+                    }
+                )
+            elif path == "/api/conference/outcome":
+                case_id = query.get("case_id", [""])[0]
+                self._json(reconcile(case_id).model_dump(mode="json"))
+            elif path == "/api/conference/summary" or path == "/api/export/bundle":
+                self._json(build_bundle(InstitutionalMemory(RUNTIME_MEMORY)))
+            elif path.startswith("/assets/"):
+                self._serve_asset(path)
             else:
                 self._json({"error": "not found"}, HTTPStatus.NOT_FOUND)
         except FileNotFoundError:
@@ -125,6 +149,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._illustrate()
             elif url.path == "/narrate":
                 self._narrate()
+            elif url.path == "/api/conference/finalize":
+                self._finalize()
             else:
                 self._json({"error": "not found"}, HTTPStatus.NOT_FOUND)
         except Exception as exc:  # pragma: no cover
@@ -132,10 +158,24 @@ class Handler(BaseHTTPRequestHandler):
 
     # --- implementations -------------------------------------------------------
     def _serve_page(self) -> None:
-        body = PAGE.read_bytes()
+        page = APP_DIST / "index.html" if (APP_DIST / "index.html").exists() else LEGACY_PAGE
+        body = page.read_bytes()
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _serve_asset(self, path: str) -> None:
+        target = (APP_DIST / path.lstrip("/")).resolve()
+        if not str(target).startswith(str(APP_DIST.resolve())) or not target.is_file():
+            self._json({"error": "not found"}, HTTPStatus.NOT_FOUND)
+            return
+        body = target.read_bytes()
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", _CONTENT_TYPES.get(target.suffix, "application/octet-stream"))
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "max-age=3600")
         self.end_headers()
         self.wfile.write(body)
 
@@ -188,6 +228,48 @@ class Handler(BaseHTTPRequestHandler):
             self._json({"text": text, "source": "bonsai"})
         except (urllib.error.URLError, TimeoutError, OSError):
             self._json({"error": "writer unreachable", "writer_url": WRITER.base_url}, HTTPStatus.SERVICE_UNAVAILABLE)
+
+    def _finalize(self) -> None:
+        body = self._body()
+        case = _load_case(body.get("case", "pneumonia_case_001.json"))
+        layer = KnowledgeLayer(body.get("knowledge_layer", "service_line"))
+        judgments = [
+            Judgment(
+                step=j["step"],
+                pass_votes=int(j.get("pass_votes", 0)),
+                fail_votes=int(j.get("fail_votes", 0)),
+                note=j.get("note", ""),
+                leader_override=j.get("leader_override"),
+            )
+            for j in body.get("judgments", [])
+        ]
+        lesson = None
+        lesson_body = body.get("lesson")
+        if lesson_body and lesson_body.get("text"):
+            lesson = Lesson(
+                text=lesson_body["text"],
+                knowledge_layer=KnowledgeLayer(lesson_body.get("knowledge_layer", layer.value)),
+                source_case_id=case.patient_id,
+            )
+
+        memory = InstitutionalMemory(RUNTIME_MEMORY)
+        session = start_session("web-session", [case.patient_id])
+        runtime = present(case, memory)
+        result = finalize_case(memory, session, case, runtime, judgments, lesson, layer)
+        memory.record_eval_cases(build_eval_cases(runtime, judgments, layer))
+        memory.record_preferences(build_preference_pairs(runtime, judgments, lesson, layer))
+
+        bundle = build_bundle(memory)
+        self._json(
+            {
+                "case_study": result.case_study.model_dump(mode="json"),
+                "outcome": result.outcome.model_dump(mode="json"),
+                "taxonomy": axial_taxonomy([j.note for j in judgments]),
+                "counts": bundle["counts"],
+                "alignment": bundle["alignment"],
+                "memory": self._memory_state(),
+            }
+        )
 
 
 app = typer.Typer(add_completion=False)

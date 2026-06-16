@@ -1,0 +1,166 @@
+/* ============================================================================
+   Pneumonia Discharge — Institutional Memory
+   Aesthetic: clinical-editorial instrument. Dark atlas canvas, Fraunces display
+   serif + IBM Plex body/mono. Signature: the --accent shifts temperature with
+   the room's emotion across the nine states.
+   ============================================================================ */
+
+:root {
+  --ink: #0a0e13;
+  --ink-2: #0e141b;
+  --panel: #121a23;
+  --panel-2: #0f1620;
+  --line: #1e2a37;
+  --line-2: #283848;
+  --paper: #e9eef4;
+  --dim: #93a3b4;
+  --faint: #5a6b7d;
+
+  --teal: #4ec8ba;
+  --gold: #e3b25f;
+  --rose: #cf99d8;
+  --blue: #82a6f2;
+  --red: #e36862;
+  --green: #45b483;
+
+  /* band colors */
+  --low: #45b483;
+  --moderate: #e3b25f;
+  --high: #e36862;
+
+  /* emotion-temperature accent — overridden per [data-emotion] */
+  --accent: var(--teal);
+  --accent-soft: #4ec8ba22;
+  --halo: #4ec8ba14;
+
+  --serif: "Fraunces", "Iowan Old Style", Georgia, serif;
+  --sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --r: 14px;
+  --shadow: 0 18px 50px -22px #000a;
+}
+
+[data-emotion="curiosity"] { --accent: var(--blue); --accent-soft: #82a6f222; --halo: #82a6f214; }
+[data-emotion="empathy"]   { --accent: var(--rose); --accent-soft: #cf99d822; --halo: #cf99d816; }
+[data-emotion="tension"]   { --accent: var(--gold); --accent-soft: #e3b25f22; --halo: #e3b25f16; }
+[data-emotion="humility"]  { --accent: var(--red);  --accent-soft: #e3686222; --halo: #e3686214; }
+[data-emotion="alignment"] { --accent: var(--teal); --accent-soft: #4ec8ba22; --halo: #4ec8ba16; }
+[data-emotion="pride"]     { --accent: var(--gold); --accent-soft: #e3b25f26; --halo: #e3b25f1c; }
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--sans);
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  min-height: 100vh;
+  background:
+    radial-gradient(1100px 620px at 78% -8%, var(--halo), transparent 60%),
+    radial-gradient(820px 480px at -8% 108%, #0e201d55, transparent 55%),
+    linear-gradient(180deg, #0a0e13, #090c11);
+  background-attachment: fixed;
+  transition: background 1.2s ease;
+}
+
+/* subtle grain overlay for atmosphere */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  z-index: 9999;
+}
+
+h1, h2, h3 { font-family: var(--serif); font-weight: 500; letter-spacing: 0.1px; margin: 0; }
+
+.mono { font-family: var(--mono); }
+.label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+button {
+  font-family: var(--sans);
+  cursor: pointer;
+  border: none;
+}
+
+.primary {
+  background: var(--accent);
+  color: #07100e;
+  font-weight: 600;
+  border-radius: 11px;
+  padding: 12px 22px;
+  font-size: 14px;
+  letter-spacing: 0.2px;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
+  box-shadow: 0 10px 30px -12px var(--accent);
+}
+.primary:hover { transform: translateY(-1px); filter: brightness(1.07); }
+.primary:disabled { opacity: 0.45; transform: none; cursor: default; box-shadow: none; }
+
+.ghost {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--line-2);
+  border-radius: 11px;
+  padding: 11px 18px;
+  font-size: 13.5px;
+  transition: border-color 0.2s ease, color 0.2s ease;
+}
+.ghost:hover { border-color: var(--accent); }
+
+.card {
+  background: linear-gradient(180deg, var(--panel), var(--panel-2));
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  box-shadow: var(--shadow);
+}
+
+/* staggered entrance for state bodies */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.rise { animation: rise 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.rise-1 { animation-delay: 0.05s; }
+.rise-2 { animation-delay: 0.12s; }
+.rise-3 { animation-delay: 0.2s; }
+.rise-4 { animation-delay: 0.28s; }
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: #ffffff14; border-radius: 4px; }
+
+/* shared stage layout for the nine states */
+.stage { max-width: 1120px; margin: 0 auto; padding: 40px 26px 80px; }
+.stage .eyebrow { color: var(--accent); transition: color 1s ease; }
+.hero {
+  font-size: clamp(28px, 4.4vw, 46px);
+  line-height: 1.06;
+  letter-spacing: -0.4px;
+  max-width: 16ch;
+  margin: 14px 0 0;
+}
+.hero .em { font-style: italic; color: var(--accent); transition: color 1s ease; }
+.lead { font-size: 15px; line-height: 1.62; color: var(--dim); max-width: 60ch; margin: 18px 0 0; }
+.cta { margin-top: 30px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.muted { color: var(--faint); font-size: 12.5px; }
+.err { margin-top: 16px; color: var(--high); font-size: 13px; }
+.grid2 { display: grid; grid-template-columns: 1.04fr 1fr; gap: 22px; align-items: start; }
+@media (max-width: 900px) { .grid2 { grid-template-columns: 1fr; } }
+.pad { padding: 22px 22px; }
+.sec-title { font-size: 18px; }
+.sec-lead { font-size: 12.5px; color: var(--dim); margin: 5px 0 16px; line-height: 1.5; }
