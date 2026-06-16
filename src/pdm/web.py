@@ -40,8 +40,12 @@ from .schemas import Judgment, KnowledgeLayer, Lesson, PatientCase
 from .session import finalize_case, hero_seed, present, reconcile, start_session, vignette_for
 
 ROOT = Path(__file__).resolve().parents[2]
-PAGE = ROOT / "web" / "index.html"
+APP_DIST = ROOT / "app" / "dist"          # built Svelte conference app (preferred)
+LEGACY_PAGE = ROOT / "web" / "index.html"  # single-file studio (fallback)
 PATIENTS = ROOT / "examples" / "patients"
+
+_CONTENT_TYPES = {".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml",
+                  ".ico": "image/x-icon", ".json": "application/json", ".woff2": "font/woff2"}
 RUNTIME_MEMORY = ROOT / "examples" / "memory" / "web_runtime"
 
 WRITER = BonsaiWriter(os.environ.get("BONSAI_WRITER_URL", "http://127.0.0.1:8080"))
@@ -129,6 +133,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(reconcile(case_id).model_dump(mode="json"))
             elif path == "/api/conference/summary" or path == "/api/export/bundle":
                 self._json(build_bundle(InstitutionalMemory(RUNTIME_MEMORY)))
+            elif path.startswith("/assets/"):
+                self._serve_asset(path)
             else:
                 self._json({"error": "not found"}, HTTPStatus.NOT_FOUND)
         except FileNotFoundError:
@@ -152,10 +158,24 @@ class Handler(BaseHTTPRequestHandler):
 
     # --- implementations -------------------------------------------------------
     def _serve_page(self) -> None:
-        body = PAGE.read_bytes()
+        page = APP_DIST / "index.html" if (APP_DIST / "index.html").exists() else LEGACY_PAGE
+        body = page.read_bytes()
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _serve_asset(self, path: str) -> None:
+        target = (APP_DIST / path.lstrip("/")).resolve()
+        if not str(target).startswith(str(APP_DIST.resolve())) or not target.is_file():
+            self._json({"error": "not found"}, HTTPStatus.NOT_FOUND)
+            return
+        body = target.read_bytes()
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", _CONTENT_TYPES.get(target.suffix, "application/octet-stream"))
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "max-age=3600")
         self.end_headers()
         self.wfile.write(body)
 
