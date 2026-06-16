@@ -37,6 +37,12 @@ pairs + the acceleration curve) → loop, then **Summary** (download the bundle)
 and TPR/TNR judge alignment reported per knowledge layer (organizational → domain → service-line → patient). See
 [the design spec](docs/superpowers/specs/2026-06-15-institutional-knowledge-collector-design.md).
 
+**Leveraging the evals.** The Summary screen doesn't just dump numbers — it *visualizes* them (the tool-vs-room
+alignment matrix, the failure taxonomy) and turns them into **recommended next steps grounded in Hamel's FAQ**,
+each tagged to the principle it applies. When the local Bonsai writer is running, an **eval advisor** narrates a
+tuned read of the session. The Decide step likewise offers a Bonsai-suggested reusable rule with a deterministic
+fallback. Everything degrades gracefully offline.
+
 ---
 
 ## Why this exists

@@ -34,9 +34,9 @@ const COHORT = [
 
 function freshJudgments(): JudgmentInput[] {
   return [
-    { step: "analyze", pass_votes: 0, fail_votes: 0, note: "" },
-    { step: "simulate", pass_votes: 0, fail_votes: 0, note: "" },
-    { step: "output", pass_votes: 0, fail_votes: 0, note: "" },
+    { step: "analyze", verdict: null, note: "" },
+    { step: "simulate", verdict: null, note: "" },
+    { step: "output", verdict: null, note: "" },
   ];
 }
 
@@ -104,6 +104,13 @@ class Conference {
   }
   toJudge() {
     this.goto("judge");
+  }
+
+  allVoted(): boolean {
+    return this.judgments.every((j) => j.verdict !== null);
+  }
+  failedSteps(): string[] {
+    return this.judgments.filter((j) => j.verdict === "fail").map((j) => j.step);
   }
 
   async lockVote() {

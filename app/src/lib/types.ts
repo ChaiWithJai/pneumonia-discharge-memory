@@ -69,9 +69,29 @@ export interface Outcome {
 }
 export interface JudgmentInput {
   step: JudgedStep;
-  pass_votes: number;
-  fail_votes: number;
+  verdict: Verdict | null; // boolean lever: sound (pass) / flag (fail)
   note: string;
+}
+export interface Recommendation {
+  title: string;
+  detail: string;
+  principle: string;
+  severity: string;
+}
+export interface Insights {
+  interpretation: string;
+  confusion: { tp: number; fp: number; tn: number; fn: number };
+  alignment: Alignment[];
+  taxonomy: { category: string; count: number; examples: string[] }[];
+  counts: { eval_cases: number; preference_pairs: number; case_studies: number; lessons: number };
+  pass_rate: number | null;
+  recommendations: Recommendation[];
+  advisor: { text: string; source: string } | null;
+  canon: string;
+}
+export interface RuleSuggestion {
+  text: string;
+  source: string;
 }
 export interface Alignment {
   knowledge_layer: string;

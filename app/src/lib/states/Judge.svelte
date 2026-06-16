@@ -6,61 +6,40 @@
   let seed = $derived(conf.present?.hero_seed ?? 7);
 
   const CLAIM: Record<string, string> = {
-    analyze: "The risk scoring & recursive validation",
-    simulate: "The discharge alternatives modeled",
-    output: "The final disposition & human handoff",
+    analyze: "How the runtime scored the risk and validated it",
+    simulate: "The discharge alternatives the runtime modeled",
+    output: "The final disposition and human handoff",
   };
-
-  function consensus(p: number, f: number) {
-    return p >= f ? "pass" : "fail";
-  }
-  function contested(p: number, f: number) {
-    const t = p + f;
-    return t > 0 && Math.min(p, f) / t >= 0.34;
-  }
-  function bump(i: number, field: "pass_votes" | "fail_votes", d: number) {
-    conf.judgments[i][field] = Math.max(0, conf.judgments[i][field] + d);
-  }
 </script>
 
 {#if r}
   <section class="stage">
-    <p class="label eyebrow rise rise-1">Judge · the room votes</p>
-    <h1 class="hero rise rise-1">Was the runtime <span class="em">right</span>?</h1>
+    <p class="label eyebrow rise rise-1">Judge · the room's verdict</p>
+    <h1 class="hero rise rise-1">Did the runtime get each step <span class="em">right</span>?</h1>
     <p class="lead rise rise-2">
-      Binary only — pass or fail, plus one line of why. Tally the room for each of the three clinically-weighted steps.
-      Disagreement is signal, not noise.
+      For each step, set the room's call — does it look sound, or should it be flagged for review? Add one line of why.
+      Two choices, no scores to tally. Disagreement in the room is the signal we keep.
     </p>
 
     <div class="grid2" style="margin-top:26px">
       <div class="votes rise rise-2">
         {#each conf.judgments as j, i (j.step)}
-          {@const c = consensus(j.pass_votes, j.fail_votes)}
-          <div class="vote card pad">
+          <div class="vote card pad" class:set={j.verdict !== null}>
             <div class="vtop">
-              <div>
-                <span class="vstep mono">{j.step}</span>
-                <div class="vclaim">{CLAIM[j.step]}</div>
-              </div>
-              <span class="cons cons-{c}">
-                {c}{#if contested(j.pass_votes, j.fail_votes)} · contested{/if}
-              </span>
+              <span class="vstep mono">{j.step}</span>
+              <div class="vclaim">{CLAIM[j.step]}</div>
             </div>
-            <div class="tallies">
-              <div class="tally pass">
-                <span class="tlabel">pass</span>
-                <button class="step-btn" onclick={() => bump(i, "pass_votes", -1)}>−</button>
-                <span class="count">{j.pass_votes}</span>
-                <button class="step-btn" onclick={() => bump(i, "pass_votes", 1)}>+</button>
-              </div>
-              <div class="tally fail">
-                <span class="tlabel">fail</span>
-                <button class="step-btn" onclick={() => bump(i, "fail_votes", -1)}>−</button>
-                <span class="count">{j.fail_votes}</span>
-                <button class="step-btn" onclick={() => bump(i, "fail_votes", 1)}>+</button>
-              </div>
+
+            <div class="lever" role="group" aria-label="verdict for {j.step}">
+              <button class="opt sound" class:active={j.verdict === "pass"} onclick={() => (conf.judgments[i].verdict = "pass")}>
+                <span class="ico">✓</span> Looks sound
+              </button>
+              <button class="opt flag" class:active={j.verdict === "fail"} onclick={() => (conf.judgments[i].verdict = "fail")}>
+                <span class="ico">▲</span> Flag for review
+              </button>
             </div>
-            <input class="note" placeholder="one line why…" bind:value={j.note} />
+
+            <input class="note" placeholder="why — one line (optional)" bind:value={j.note} />
           </div>
         {/each}
       </div>
@@ -74,31 +53,34 @@
     </div>
 
     <div class="cta rise rise-4">
-      <button class="primary" onclick={() => conf.lockVote()} disabled={conf.busy}>
-        {conf.busy ? "Reconciling…" : "Lock consensus →"}
+      <button class="primary" onclick={() => conf.lockVote()} disabled={conf.busy || !conf.allVoted()}>
+        {conf.busy ? "Reconciling…" : "Lock the room's verdict →"}
       </button>
+      {#if !conf.allVoted()}<span class="muted">set a verdict on all three steps to continue</span>{/if}
     </div>
   </section>
 {/if}
 
 <style>
   .votes { display: flex; flex-direction: column; gap: 12px; }
-  .vtop { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .vote { transition: border-color 0.3s ease; }
+  .vote.set { border-color: var(--line-2); }
+  .vtop { display: flex; flex-direction: column; gap: 3px; margin-bottom: 13px; }
   .vstep { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); }
-  .vclaim { font-size: 13.5px; margin-top: 3px; }
-  .cons { font-family: var(--mono); font-size: 10.5px; padding: 4px 9px; border-radius: 7px; text-transform: uppercase; letter-spacing: 0.06em; }
-  .cons-pass { background: #16302a; color: var(--low); }
-  .cons-fail { background: #341a19; color: var(--high); }
-  .tallies { display: flex; gap: 10px; margin: 13px 0 11px; }
-  .tally { flex: 1; display: flex; align-items: center; gap: 9px; padding: 8px 11px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel-2); }
-  .tlabel { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; }
-  .tally.pass .tlabel { color: var(--low); }
-  .tally.fail .tlabel { color: var(--high); }
-  .count { font-family: var(--serif); font-size: 19px; min-width: 22px; text-align: center; }
-  .step-btn { width: 24px; height: 24px; border-radius: 7px; background: #ffffff0c; color: var(--paper); font-size: 15px; line-height: 1; }
-  .step-btn:hover { background: var(--accent-soft); }
-  .note { width: 100%; background: var(--ink-2); border: 1px solid var(--line); border-radius: 9px; color: var(--paper); padding: 9px 12px; font-family: var(--sans); font-size: 12.5px; }
+  .vclaim { font-size: 14px; }
+  .lever { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 11px; }
+  .opt {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 13px 12px; border-radius: 11px; font-size: 13.5px; font-weight: 500;
+    border: 1px solid var(--line); background: var(--panel-2); color: var(--dim);
+    transition: all 0.18s ease;
+  }
+  .opt .ico { font-size: 12px; }
+  .opt:hover { border-color: var(--line-2); color: var(--paper); }
+  .opt.sound.active { background: #16302a; border-color: #2c7a55; color: #8fe6c8; box-shadow: 0 0 0 1px #2c7a5566; }
+  .opt.flag.active { background: #341a19; border-color: #8f3a37; color: #f0a6a3; box-shadow: 0 0 0 1px #8f3a3766; }
+  .note { width: 100%; background: var(--ink-2); border: 1px solid var(--line); border-radius: 10px; color: var(--paper); padding: 10px 13px; font-family: var(--sans); font-size: 12.5px; }
   .note:focus { outline: none; border-color: var(--accent); }
   .anchor .label { display: block; margin-bottom: 10px; }
-  .anchor :global(.frame) { max-height: 220px; }
+  .anchor :global(.frame) { max-height: 230px; }
 </style>

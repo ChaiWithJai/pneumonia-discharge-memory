@@ -7,10 +7,25 @@
   let seed = $derived(conf.present?.hero_seed ?? 7);
 
   let truth = $derived(!!o?.readmitted_30d);
-  let roomPos = $derived(conf.judgments.some((j) => (j.pass_votes >= j.fail_votes ? false : true)));
-  let toolPos = $derived(r?.handoff.disposition === "clinician_review_required");
+  let roomFlagged = $derived(conf.judgments.some((j) => j.verdict === "fail"));
+  let toolFlagged = $derived(r?.handoff.disposition === "clinician_review_required");
 
-  // the path the outcome confirms: the riskiest scenario if readmitted, else the safest
+  let outcomeText = $derived(
+    truth
+      ? `was readmitted${o?.days_to_readmit ? ` on day ${o.days_to_readmit}` : ""}`
+      : "was not readmitted",
+  );
+  let headline = $derived(truth ? `Readmitted · day ${o?.days_to_readmit ?? "?"}` : "Not readmitted");
+
+  function verdict(flagged: boolean) {
+    return flagged === truth ? "right" : "off";
+  }
+  function sentence(who: string, flagged: boolean) {
+    const stance = flagged ? "flagged this discharge as risky" : "trusted this discharge";
+    const tail = flagged === truth ? "That call matched reality." : "That call missed reality — a lesson worth keeping.";
+    return `${who} ${stance}, and the patient ${outcomeText}. ${tail}`;
+  }
+
   let callback = $derived(
     r ? [...r.scenarios].sort((a, b) => b.readmission_risk_delta - a.readmission_risk_delta)[truth ? 0 : r.scenarios.length - 1] : null,
   );
@@ -20,23 +35,25 @@
   <section class="stage">
     <p class="label eyebrow rise rise-1">Reckon · the data lake</p>
     <h1 class="hero rise rise-1">What actually happened.</h1>
+    <p class="lead rise rise-2">
+      The mock data lake reveals the real 30-day outcome. Where a call matched reality, you've found a signal to
+      trust; where it diverged, you've found a lesson. This is how the care team and the data team meet.
+    </p>
 
     <div class="reveal card pad rise rise-2" class:bad={truth}>
-      <div class="big">{truth ? "Readmitted" : "Not readmitted"}{#if truth && o.days_to_readmit} · day {o.days_to_readmit}{/if}</div>
-      <div class="sub mono">LOS {o.length_of_stay_days}d · follow-up {o.followup_kept ? "kept" : "missed"} · source: mock data lake</div>
+      <div class="big">{headline}</div>
+      <div class="sub mono">length of stay {o.length_of_stay_days}d · follow-up {o.followup_kept ? "kept" : "missed"} · source: mock data lake</div>
     </div>
 
     <div class="grid2" style="margin-top:22px">
       <div class="meters rise rise-3">
         <div class="m card pad">
-          <span class="label">The room vs. reality</span>
-          <div class="verdict {roomPos === truth ? 'hit' : 'miss'}">{roomPos === truth ? "foresaw it" : "missed it"}</div>
-          <p class="mnote">The room {roomPos ? "distrusted" : "trusted"} the discharge; the patient was {truth ? "readmitted" : "not readmitted"}.</p>
+          <div class="mhead"><span class="label">The room's call</span><span class="tag tag-{verdict(roomFlagged)}">{verdict(roomFlagged) === "right" ? "matched reality" : "off"}</span></div>
+          <p class="mnote">{sentence("The room", roomFlagged)}</p>
         </div>
         <div class="m card pad">
-          <span class="label">The tool vs. reality</span>
-          <div class="verdict {toolPos === truth ? 'hit' : 'miss'}">{toolPos === truth ? "foresaw it" : "missed it"}</div>
-          <p class="mnote">The runtime {toolPos ? "flagged review" : "saw no high risk"}; the patient was {truth ? "readmitted" : "not readmitted"}.</p>
+          <div class="mhead"><span class="label">The runtime's call</span><span class="tag tag-{verdict(toolFlagged)}">{verdict(toolFlagged) === "right" ? "matched reality" : "off"}</span></div>
+          <p class="mnote">{sentence("The runtime", toolFlagged)}</p>
         </div>
       </div>
       <div class="rise rise-3">
@@ -46,7 +63,7 @@
     </div>
 
     <div class="cta rise rise-4">
-      <button class="primary" onclick={() => conf.toDecide()}>Decide →</button>
+      <button class="primary" onclick={() => conf.toDecide()}>Decide what to keep →</button>
     </div>
   </section>
 {/if}
@@ -58,8 +75,9 @@
   .reveal.bad .big { color: #f0a6a3; }
   .sub { margin-top: 8px; color: var(--dim); font-size: 11.5px; }
   .meters { display: flex; flex-direction: column; gap: 14px; }
-  .verdict { font-family: var(--serif); font-size: 22px; margin: 8px 0 6px; }
-  .verdict.hit { color: var(--low); }
-  .verdict.miss { color: var(--moderate); }
-  .mnote { font-size: 12px; color: var(--dim); line-height: 1.5; margin: 0; }
+  .mhead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 9px; }
+  .tag { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; padding: 4px 9px; border-radius: 7px; }
+  .tag-right { background: #16302a; color: var(--low); }
+  .tag-off { background: #33290f; color: var(--moderate); }
+  .mnote { font-size: 13px; color: var(--paper); line-height: 1.55; margin: 0; }
 </style>
