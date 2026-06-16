@@ -1,10 +1,11 @@
 {
   "patient_id": "synthetic-pna-001",
+  "run_index": 1,
   "instruments": [
     {
       "name": "frailty_index_calculator",
-      "version": "0.1.0-demo",
-      "purpose": "Estimate discharge fragility from mobility, nutrition, age, and recent utilization.",
+      "version": "0.2.0",
+      "purpose": "Estimate discharge fragility from age, mobility, falls, nutrition, and recent utilization.",
       "inputs": [
         "age",
         "mobility.current_mobility_drop",
@@ -14,7 +15,7 @@
       ],
       "validation_checks": [
         "bounded score 0-1",
-        "monotonic mobility penalty",
+        "empty input yields zero",
         "review high-frailty cases"
       ],
       "limitations": [
@@ -25,8 +26,8 @@
     },
     {
       "name": "secondary_infection_risk_classifier",
-      "version": "0.1.0-demo",
-      "purpose": "Flag unresolved infection concern from WBC trajectory, procalcitonin trend, cultures, and vitals.",
+      "version": "0.2.0",
+      "purpose": "Flag unresolved infection concern from WBC trajectory, procalcitonin trend, cultures, and fever clock.",
       "inputs": [
         "labs.wbc_current",
         "labs.wbc_48h_delta",
@@ -35,26 +36,27 @@
         "vitals.afebrile_hours"
       ],
       "validation_checks": [
-        "borderline values force clinician review",
+        "borderline values escalate to clinician review",
         "culture-pending state preserved",
-        "rising inflammatory markers increase risk"
+        "rising markers increase risk"
       ],
       "limitations": [
-        "Rule-based demo",
+        "Synthetic rule-based demo",
+        "Not clinically validated",
         "No antimicrobial recommendation",
         "No replacement for infectious disease review"
       ]
     },
     {
       "name": "environmental_medication_access_rules",
-      "version": "0.1.0-demo",
+      "version": "0.2.0",
       "purpose": "Represent non-clinical discharge risks that drive avoidable readmission.",
       "inputs": [
-        "social.zip_code",
-        "social.pharmacy_access_minutes",
-        "social.caregiver_available",
         "meds.med_access_risk",
-        "meds.adherence_concern"
+        "meds.adherence_concern",
+        "social.pharmacy_access_minutes",
+        "social.isolated",
+        "social.health_literacy_risk"
       ],
       "validation_checks": [
         "no protected-class inference",
@@ -62,19 +64,32 @@
         "route high access risk to support planning"
       ],
       "limitations": [
-        "Zip-code demo is a placeholder",
+        "Synthetic SDOH placeholder",
+        "Not clinically validated",
         "Requires vetted SDOH data and fairness review"
       ]
     }
   ],
+  "factory_report": {
+    "run_index": 1,
+    "tools_generated": [
+      "frailty_index_calculator",
+      "secondary_infection_risk_classifier",
+      "environmental_medication_access_rules"
+    ],
+    "tools_reused": [],
+    "engineering_steps_this_run": 3,
+    "engineering_steps_saved": 0,
+    "cumulative_tools_in_memory": 3
+  },
   "trace": [
     {
       "state": "factory",
-      "action": "Construct pneumonia discharge instruments.",
+      "action": "Assemble pneumonia discharge instruments via generative toolchain (reuse-or-generate).",
       "inputs": [
         "clinical objective",
         "synthetic case schema",
-        "source-informed discharge-risk categories"
+        "institutional memory"
       ],
       "outputs": [
         "frailty_index_calculator",
@@ -82,11 +97,13 @@
         "environmental_medication_access_rules"
       ],
       "checks": [
-        "instrument metadata declared",
-        "limitations declared",
-        "synthetic-only flag retained"
+        "objective: Assess pneumonia discharge readiness across clinical stability, unresolved infection risk, and non-clinical (environmental/medication-access) risk, with a mandatory human handoff.",
+        "generated this run: ['frailty_index_calculator', 'secondary_infection_risk_classifier', 'environmental_medication_access_rules']",
+        "reused from memory: none",
+        "engineering steps saved this run: 0",
+        "each tool validated (bounded score, zero-input -> 0) before use"
       ],
-      "timestamp": "2026-06-16T02:29:23.871897Z"
+      "timestamp": "2026-06-16T03:08:56.400975Z"
     },
     {
       "state": "plan",
@@ -109,11 +126,11 @@
         "data gaps represented",
         "human handoff retained"
       ],
-      "timestamp": "2026-06-16T02:29:23.872308Z"
+      "timestamp": "2026-06-16T03:08:56.400980Z"
     },
     {
       "state": "analyze",
-      "action": "Score frailty, infection, and environmental access risk.",
+      "action": "Score risk and run recursive validation loop to fixed point (2 iterations).",
       "inputs": [
         "frailty_index",
         "secondary_infection_risk",
@@ -128,13 +145,14 @@
         "frailty_index high: force clinician_review_required.",
         "Infection risk borderline/high with pending cultures: re-evaluate before final handoff.",
         "environmental_medication_access_risk high: force clinician_review_required.",
-        "Access risk elevated: verify medication-in-hand or delivery before discharge."
+        "Access risk elevated: verify medication-in-hand or delivery before discharge.",
+        "Room-air SpO2 below 92%: confirm oxygenation stability before discharge."
       ],
-      "timestamp": "2026-06-16T02:29:23.872353Z"
+      "timestamp": "2026-06-16T03:08:56.401020Z"
     },
     {
       "state": "simulate",
-      "action": "Generate what-if discharge scenarios and empathy prompts.",
+      "action": "Generate what-if discharge scenarios and empathy image prompts.",
       "inputs": [
         "scores",
         "case context"
@@ -148,7 +166,7 @@
         "generated media is non-authoritative",
         "scenario assumptions explicit"
       ],
-      "timestamp": "2026-06-16T02:29:23.872365Z"
+      "timestamp": "2026-06-16T03:08:56.401029Z"
     },
     {
       "state": "output",
@@ -166,7 +184,7 @@
         "red flags surfaced",
         "actions are considerations, not orders"
       ],
-      "timestamp": "2026-06-16T02:29:23.872372Z"
+      "timestamp": "2026-06-16T03:08:56.401035Z"
     }
   ],
   "scores": [
@@ -179,10 +197,10 @@
           "key": "age",
           "value": 82,
           "source": "synthetic case",
-          "interpretation": "Age contributes to frailty burden."
+          "interpretation": "Advanced age contributes to frailty burden."
         },
         {
-          "key": "mobility_drop",
+          "key": "mobility.current_mobility_drop",
           "value": "moderate",
           "source": "synthetic mobility assessment",
           "interpretation": "Mobility decline is a discharge support signal."
@@ -195,16 +213,16 @@
       "band": "moderate",
       "evidence": [
         {
-          "key": "wbc_48h_delta",
+          "key": "labs.wbc_48h_delta",
           "value": 1.4,
           "source": "synthetic labs",
           "interpretation": "Rising WBC triggers recursive review."
         },
         {
-          "key": "afebrile_hours",
+          "key": "vitals.afebrile_hours",
           "value": 36,
           "source": "synthetic vitals",
-          "interpretation": "Clinical stability should be reviewed before discharge."
+          "interpretation": "Clinical stability should be reconfirmed before discharge."
         }
       ]
     },
@@ -214,14 +232,15 @@
       "band": "high",
       "evidence": [
         {
-          "key": "pharmacy_access_minutes",
+          "key": "social.pharmacy_access_minutes",
           "value": 42,
           "source": "synthetic SDOH",
-          "interpretation": "Medication access may require support."
+          "interpretation": "Medication access may require delivery or support."
         }
       ]
     }
   ],
+  "analyze_iterations": 2,
   "scenarios": [
     {
       "name": "discharge_today_no_added_support",
@@ -264,10 +283,11 @@
     "clinician_note": "Demo only: treating clinician must validate all findings against the real chart and local policy."
   },
   "institutional_memory_event": {
-    "event_type": "pneumonia_discharge_runtime_completed",
-    "schema_version": "0.1.0",
-    "created_at": "2026-06-16T02:29:23.872374+00:00",
+    "type": "case_completed",
+    "schema_version": "0.2.0",
+    "created_at": "2026-06-16T03:08:56.401043+00:00",
     "patient_id": "synthetic-pna-001",
+    "run_index": 1,
     "service_line": "pulmonary",
     "domain": "pneumonia_discharge",
     "reusable_assets": [
@@ -298,7 +318,15 @@
         "delay_24h_reassess",
         "discharge_with_medication_and_home_support"
       ],
-      "handoff_disposition": "clinician_review_required"
+      "handoff_disposition": "clinician_review_required",
+      "tools_generated": [
+        "frailty_index_calculator",
+        "secondary_infection_risk_classifier",
+        "environmental_medication_access_rules"
+      ],
+      "tools_reused": [],
+      "engineering_steps_saved": 0,
+      "analyze_iterations": 2
     },
     "note": "Synthetic demo event. Do not store PHI."
   }
