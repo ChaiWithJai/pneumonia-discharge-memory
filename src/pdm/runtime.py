@@ -1,10 +1,26 @@
+"""The governed runtime: Factory -> Plan -> Analyze -> Simulate -> Output -> Persist.
+
+The runtime reads institutional memory *before* it reasons, assembles (reuses or
+generates) its instruments, scores the case, runs a recursive validation loop to a
+fixed point, simulates discharge alternatives, and produces a human handoff. Every
+state appends an auditable TraceStep. Persistence is part of the contract, not an
+afterthought — that is what lets the next run be cheaper than this one.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
 
-from .instruments import factory_instruments, score_case
-from .memory import append_memory, memory_event
-from .schemas import HandoffRecommendation, PatientCase, RuntimeResult, RuntimeState, Score, TraceStep
+from .factory import OBJECTIVE, assemble
+from .memory import InstitutionalMemory, case_event
+from .schemas import (
+    HandoffRecommendation,
+    PatientCase,
+    RuntimeResult,
+    RuntimeState,
+    Score,
+    TraceStep,
+)
 from .whatif import generate_whatif_scenarios
 
 
@@ -24,18 +40,33 @@ def plan_trace(case: PatientCase) -> list[str]:
     return requirements
 
 
-def recursive_checks(scores: list[Score], case: PatientCase) -> list[str]:
+def recursive_validation(scores: list[Score], case: PatientCase, max_iters: int = 4) -> tuple[list[str], int]:
+    """Apply validation passes until no new finding fires (a real fixed point)."""
     checks: list[str] = []
-    for score in scores:
-        if score.band == "high":
-            checks.append(f"{score.name} high: force clinician_review_required.")
-        if score.name == "secondary_infection_risk" and score.value >= 0.34 and case.labs.cultures_pending:
-            checks.append("Infection risk borderline/high with pending cultures: re-evaluate before final handoff.")
-        if score.name == "environmental_medication_access_risk" and score.value >= 0.34:
-            checks.append("Access risk elevated: verify medication-in-hand or delivery before discharge.")
+
+    def add(msg: str) -> None:
+        if msg not in checks:
+            checks.append(msg)
+
+    iterations = 0
+    prev_len = -1
+    while len(checks) != prev_len and iterations < max_iters:
+        prev_len = len(checks)
+        iterations += 1
+        for score in scores:
+            if score.band == "high":
+                add(f"{score.name} high: force clinician_review_required.")
+            if score.name == "secondary_infection_risk" and score.value >= 0.34 and case.labs.cultures_pending:
+                add("Infection risk borderline/high with pending cultures: re-evaluate before final handoff.")
+            if score.name == "environmental_medication_access_risk" and score.value >= 0.34:
+                add("Access risk elevated: verify medication-in-hand or delivery before discharge.")
+        if case.labs.procalcitonin_trend == "unknown":
+            add("Procalcitonin trend unknown: flag data gap for clinician completeness review.")
+        if case.vitals.oxygen_saturation_room_air < 92:
+            add("Room-air SpO2 below 92%: confirm oxygenation stability before discharge.")
     if not checks:
         checks.append("No high-risk recursive checks triggered in synthetic scoring path.")
-    return checks
+    return checks, iterations
 
 
 def handoff(case: PatientCase, scores: list[Score], checks: list[str]) -> HandoffRecommendation:
@@ -79,16 +110,32 @@ def handoff(case: PatientCase, scores: list[Score], checks: list[str]) -> Handof
     )
 
 
-def run(case: PatientCase, memory_dir: Path | None = None) -> RuntimeResult:
+def run(
+    case: PatientCase,
+    memory: InstitutionalMemory | None = None,
+    memory_dir: Path | None = None,
+    designer: object | None = None,
+) -> RuntimeResult:
+    if memory is None:
+        memory = InstitutionalMemory(memory_dir) if memory_dir else InstitutionalMemory(Path("examples/memory/institutional"))
+
     trace: list[TraceStep] = []
-    instruments = factory_instruments()
+
+    factory = assemble(case, memory, designer=designer)
+    fr = factory.report
     trace.append(
         TraceStep(
             state=RuntimeState.FACTORY,
-            action="Construct pneumonia discharge instruments.",
-            inputs=["clinical objective", "synthetic case schema", "source-informed discharge-risk categories"],
-            outputs=[i.name for i in instruments],
-            checks=["instrument metadata declared", "limitations declared", "synthetic-only flag retained"],
+            action="Assemble pneumonia discharge instruments via generative toolchain (reuse-or-generate).",
+            inputs=["clinical objective", "synthetic case schema", "institutional memory"],
+            outputs=[i.name for i in factory.instruments()],
+            checks=[
+                f"objective: {OBJECTIVE}",
+                f"generated this run: {fr.tools_generated or 'none'}",
+                f"reused from memory: {fr.tools_reused or 'none'}",
+                f"engineering steps saved this run: {fr.engineering_steps_saved}",
+                "each tool validated (bounded score, zero-input -> 0) before use",
+            ],
         )
     )
 
@@ -103,12 +150,12 @@ def run(case: PatientCase, memory_dir: Path | None = None) -> RuntimeResult:
         )
     )
 
-    scores = score_case(case)
-    checks = recursive_checks(scores, case)
+    scores = factory.score(case)
+    checks, iterations = recursive_validation(scores, case)
     trace.append(
         TraceStep(
             state=RuntimeState.ANALYZE,
-            action="Score frailty, infection, and environmental access risk.",
+            action=f"Score risk and run recursive validation loop to fixed point ({iterations} iterations).",
             inputs=[s.name for s in scores],
             outputs=[f"{s.name}:{s.band}:{s.value}" for s in scores],
             checks=checks,
@@ -119,7 +166,7 @@ def run(case: PatientCase, memory_dir: Path | None = None) -> RuntimeResult:
     trace.append(
         TraceStep(
             state=RuntimeState.SIMULATE,
-            action="Generate what-if discharge scenarios and empathy prompts.",
+            action="Generate what-if discharge scenarios and empathy image prompts.",
             inputs=["scores", "case context"],
             outputs=[s.name for s in scenarios],
             checks=["generated media is non-authoritative", "scenario assumptions explicit"],
@@ -137,27 +184,32 @@ def run(case: PatientCase, memory_dir: Path | None = None) -> RuntimeResult:
         )
     )
 
-    event = memory_event(
-        case,
-        None,
+    event = case_event(
+        case.patient_id,
+        fr.run_index,
+        memory.service_line,
         artifacts={
-            "instrument_names": [i.name for i in instruments],
+            "instrument_names": [i.name for i in factory.instruments()],
             "score_bands": {s.name: s.band for s in scores},
             "scenario_names": [s.name for s in scenarios],
             "handoff_disposition": recommendation.disposition,
+            "tools_generated": fr.tools_generated,
+            "tools_reused": fr.tools_reused,
+            "engineering_steps_saved": fr.engineering_steps_saved,
+            "analyze_iterations": iterations,
         },
     )
+    memory.record_case(event)
 
-    result = RuntimeResult(
+    return RuntimeResult(
         patient_id=case.patient_id,
-        instruments=instruments,
+        run_index=fr.run_index,
+        instruments=factory.instruments(),
+        factory_report=fr,
         trace=trace,
         scores=scores,
+        analyze_iterations=iterations,
         scenarios=scenarios,
         handoff=recommendation,
         institutional_memory_event=event,
     )
-    if memory_dir:
-        append_memory(memory_dir, event)
-    return result
-

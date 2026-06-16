@@ -30,7 +30,12 @@ def main(
         console.print_json(result.model_dump_json(indent=2))
         return
 
-    console.print(f"[bold teal]Pneumonia Discharge Memory[/bold teal] patient={result.patient_id}")
+    console.print(f"[bold teal]Pneumonia Discharge Memory[/bold teal] patient={result.patient_id} (run #{result.run_index})")
+    fr = result.factory_report
+    if fr.tools_generated:
+        console.print(f"[dim]Factory generated {len(fr.tools_generated)} instruments this run (cold start).[/dim]")
+    if fr.tools_reused:
+        console.print(f"[dim]Factory reused {len(fr.tools_reused)} instruments from institutional memory — {fr.engineering_steps_saved} engineering steps saved.[/dim]")
     table = Table(title="Synthetic Risk Scores")
     table.add_column("Score")
     table.add_column("Value")

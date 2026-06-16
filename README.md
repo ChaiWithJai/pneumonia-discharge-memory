@@ -1,110 +1,133 @@
 # Pneumonia Discharge Memory
 
-Open-source reference implementation for a HOMER-1-inspired pneumonia discharge readiness workflow.
+**A governed, stateful clinical-reasoning runtime for one hospital service line — that generates its own
+instruments, remembers them, and makes every discharge decision *felt* through on-device image generation.**
 
-This project is a professional demonstration of how a service-line clinical AI workload could move from raw chart context to a governed, auditable, empathy-aware discharge handoff while creating institutional memory for future pulmonary operations.
+This is an open-source reference implementation of a HOMER-1-inspired runtime: it moves a pneumonia discharge
+from raw chart context to a transparent, auditable, **human-signed** handoff, and it accumulates *institutional
+memory* so the next case — and the next pulmonary use case — costs less to launch and is safer to inspect.
 
-It is designed for:
+![The studio](docs/assets/studio.png)
 
-- Service line leaders evaluating pneumonia readmission risk and discharge operations.
-- Clinical AI builders designing stateful reasoning systems.
-- Field operators who need to explain how Strategist-style population analysis can hand off into Drivetrain-style patient workload execution.
-- Hackathon teams building health-system workflow prototypes with local AI.
+*The studio after one run: the governed pipeline, the Factory's generated instruments, banded risk scores, the
+recursive validation loop, a mandatory human handoff — and three discharge what-ifs, each illustrated on-device by
+Bonsai Image so the decision is empathetic, not just numeric.*
 
-## What This Is
+---
 
-This repo models a pulmonary service-line workflow:
+## Why this exists
+
+Modern health systems are excellent at *capturing* data and poor at *acting* on it. Most AI demos answer a
+question and forget. A clinical-operations platform should retain the tools, rules, traces, and feedback each
+workflow produces, so intelligence **compounds**. This repo demonstrates that thesis end-to-end on a real,
+narrow, defensible use case: pneumonia discharge readiness.
+
+Three ideas are made literal, not asserted:
+
+1. **Generative engineering.** The Factory does not ship hand-written calculators. It derives typed tool *specs*
+   from the clinical objective and **generates executable Python source** for each instrument, validates it
+   (bounded score, neutral-input → 0), and persists it. You can open `examples/memory/.../tools/*.py` and read
+   the code the machine wrote.
+2. **Stateful acceleration.** Generated tools are written to institutional memory and **reused** on later runs.
+   Run 1 generates three instruments; run 2 reuses all three and reports the engineering steps saved. The
+   marginal cost of each additional case falls — the acceleration curve, demonstrated.
+3. **Empathy through imaging.** Each what-if discharge path is illustrated on-device by **Bonsai Image 4B** with
+   strict dignity guardrails (no identifiable likeness, no fear tactics, no gore). The frame paints instantly
+   from the scenario and upgrades to a diffusion render when the studio is up.
+
+## The governed runtime
 
 ```text
-Pneumonia discharge objective
-  -> Factory: build validated instruments
-  -> Plan: decompose a discharge trace
-  -> Analyze: score readiness with recursive checks
-  -> Simulate: generate what-if scenarios
-  -> Output: produce structured human handoff
-  -> Persist: write institutional memory
+Pneumonia discharge objective + institutional memory
+  -> Factory:  reuse-or-generate validated instruments (executable code)
+  -> Plan:     decompose the discharge decision into an auditable trace
+  -> Analyze:  score risk, then run a recursive validation loop to a fixed point
+  -> Simulate: model discharge-today / delay-24h / discharge-with-support, with empathy prompts
+  -> Output:   structured human handoff — disposition, red flags, mandatory clinician sign-off
+  -> Persist:  write institutional memory for the pulmonary service line
 ```
 
-The reference use case is pneumonia discharge readiness, with example instruments for:
+Three risk domains, each grounded in the literature (see [docs/RESEARCH.md](docs/RESEARCH.md)):
+frailty, unresolved-infection, and environmental/medication-access.
 
-- Frailty index.
-- Secondary infection risk.
-- Environmental and medication-access risk.
-- What-if chart scenarios for discharge today vs. delayed discharge vs. medication support.
-- Structured human handoff for clinician review.
+## What this is **not**
 
-## What This Is Not
+Not medical advice, clinical decision support, or a production system. Synthetic data and simplified scoring
+demonstrate architecture, governance, and product thinking. Real deployment would require licensed clinical
+ownership, institutional validation, regulatory review, security controls, and rigorous evaluation. All
+generation is local; **no patient data leaves the device**.
 
-This is not medical advice, clinical decision support, or a production healthcare system. It uses synthetic data and simplified scoring logic to demonstrate architecture, governance, observability, and product thinking. Real clinical deployment would require licensed clinical ownership, institutional validation, regulatory review, security controls, and rigorous model evaluation.
-
-## Why This Exists
-
-The central product idea is institutional memory.
-
-Most AI demos answer a question and forget. A clinical operations platform should retain the tools, rules, traces, exceptions, outcomes, and human feedback produced by each workflow. Pneumonia discharge tooling should make the next pulmonary workflow, such as COPD flare-up management or post-discharge medication adherence, easier to launch and safer to inspect.
-
-## Local Quick Start
+## Quick start
 
 ```bash
-cd /Users/jaybhagat/projects/pneumonia-discharge-memory
-python3 -m venv .venv
-source .venv/bin/activate
+python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
-pdm-run examples/patients/pneumonia_case_001.json --memory-dir examples/memory
-pdm-prove examples/patients/pneumonia_case_001.json --memory-dir examples/memory/proof
+
+# 1) Run the governed runtime on a synthetic case (writes institutional memory)
+pdm-run examples/patients/pneumonia_case_001.json --memory-dir /tmp/pdm-mem
+pdm-run examples/patients/pneumonia_case_001.json --memory-dir /tmp/pdm-mem   # 2nd run reuses -> steps saved
+
+# 2) Prove the framework (fresh memory; generate-then-reuse in one artifact)
+pdm-prove examples/patients/pneumonia_case_001.json          # 12/12 criteria
+pdm-prove examples/patients/pneumonia_case_001.json --cohort # differentiated routing across 3 cases
+
+# 3) Launch the studio (single self-contained page + stdlib proxy)
+pdm-web                       # http://127.0.0.1:8765
+
+# 4) Tests
 pytest
 ```
 
-The proof command runs the public pneumonia use case against the finite-state HOMER-1 criteria and should report `11/11 criteria passed`. A captured proof artifact is checked in at `examples/pneumonia_case_001_homer1_proof.json`.
+The studio works fully **offline**: if the Bonsai servers are down, what-if frames fall back to a synchronously
+painted clinical canvas and narration falls back to the scenario text. No spinners, no dead ends.
 
-## Optional Local AI Integrations
+## Optional local AI (Bonsai)
 
-The core workflow is deterministic and runs without model keys.
+The core runtime is deterministic and needs no model keys. Two on-device endpoints upgrade the experience when
+present (see [the Bonsai setup](https://github.com/ChaiWithJai/the-little-tree-thinks)):
 
-Optional adapters are included for local generation:
+- **Writer** — `llama-server` (OpenAI-compatible) on `:8080`, Ternary-Bonsai-1.7B, for empathy narration.
+- **Illustrator** — the Bonsai Image 4B studio on `:8800` (`POST /generate` -> PNG), for what-if illustration.
 
-- `bonsai_text`: OpenAI-compatible local text endpoint, aligned with the Bonsai `llama-server` setup.
-- `bonsai_image`: local image generation server, aligned with Bonsai Image Demo / mflux-style generation.
-- `whatif_scene`: structured empathy prompt generator inspired by the local `whatif` scene workflow.
+The image studio sends no CORS headers, so the page never calls it directly — `pdm-web` proxies image and
+narration requests server-to-server (`/illustrate`, `/narrate`). Point the server at custom hosts with
+`BONSAI_WRITER_URL` / `BONSAI_STUDIO_URL`.
 
-These adapters are intentionally isolated. The core safety and scoring path does not depend on generated text or images.
+A real on-device render is checked in at [`examples/assets/empathy_sample.png`](examples/assets/empathy_sample.png).
 
-## Repo Structure
+## Repo structure
 
 ```text
 src/pdm/
-  schemas.py              Typed clinical workflow objects
-  instruments.py          Simplified validated instruments
-  runtime.py              Five-state runtime
-  memory.py               Institutional memory store
-  whatif.py               What-if scenario generation
-  proof.py                HOMER-1 finite-state proof harness
-  local_ai.py             Optional local AI adapters
-  cli.py                  Command-line entrypoint
-docs/
-  ARCHITECTURE.md
-  CLINICAL_SAFETY.md
-  FINITE_STATE_MACHINE.md
-  FIELD_OPERATOR_MODEL.md
-  HACKATHON_PLAYBOOK.md
-  INSTITUTIONAL_MEMORY.md
-  RESEARCH_NOTES.md
-examples/
-  patients/
-  memory/
-tests/
+  schemas.py     Typed clinical objects + generative-toolchain types (ToolSpec, GeneratedTool)
+  factory.py     Generative toolchain assembly: synthesize, validate, persist, reuse executable tools
+  memory.py      Institutional memory store (events + persisted tool artifacts)
+  runtime.py     Five-state governed runtime + recursive validation loop
+  whatif.py      What-if scenario + empathy-prompt generation
+  local_ai.py    Bonsai writer + image studio adapters (offline-first)
+  proof.py       Single-case + cohort proof harness (generative, stateful, differentiated)
+  web.py         Stdlib studio server: API + same-origin image/narration proxy
+  cli.py         pdm-run / prove_cli.py: pdm-prove
+web/index.html   The studio - one self-contained page, no build step
+docs/            ARCHITECTURE, RESEARCH (cited), CLINICAL_SAFETY, INSTITUTIONAL_MEMORY, FINITE_STATE_MACHINE,
+                 WHATIF_EMPATHY, FIELD_OPERATOR_MODEL, HACKATHON_PLAYBOOK, ROADMAP
+examples/        patients/ (synthetic cohort), assets/ (sample render), pneumonia_case_001_homer1_proof.json
+tests/           runtime, factory unit, HOMER-1 acceptance + cohort
 ```
 
-## Design Standard
+## Extending it
 
-The project is written as an open technical artifact, closer to a Linux Foundation or mature cloud ecosystem reference implementation than a pitch deck:
+The Factory's `blueprint_specs()` is the seam. Add a `ToolSpec` (typed rules) for a new pulmonary use case —
+COPD flare-up, asthma exacerbation, post-discharge adherence — and the runtime generates, validates, persists,
+and reuses it through the same governed states. A Bonsai model can also *propose* specs (`origin="bonsai_proposed"`)
+with the deterministic blueprint as a safe fallback. This is also a clean substrate for an **Out-of-Pocket Health
+hackathon**: see [docs/HACKATHON_PLAYBOOK.md](docs/HACKATHON_PLAYBOOK.md).
 
-- Explicit scope and non-goals.
-- Reproducible local run path.
-- Typed interfaces.
-- Deterministic tests.
-- Governance and safety documentation.
-- Extension points for local AI without making AI output authoritative.
+## Design standard
+
+Written as an open technical artifact — explicit scope and non-goals, reproducible local run path, typed
+interfaces, deterministic tests, generated code that is auditable, and governance/safety documentation. AI output
+is an *upgrade*, never authoritative; a human always makes the call.
 
 ## License
 

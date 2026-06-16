@@ -17,15 +17,23 @@ flowchart LR
 
 ## States
 
-### Factory
+### Factory — generative toolchain assembly
 
-Builds the instrument inventory:
+The Factory does not ship hand-written calculators. It derives typed tool *specs* from the clinical objective
+(`factory.blueprint_specs()`, or a Bonsai-proposed spec with the blueprint as fallback), **generates executable
+Python source** for each instrument (`synthesize_source`), validates it (`validate_tool`: bounded score in
+[0,1], neutral inputs -> 0), then either **reuses** a persisted artifact from institutional memory or generates
+and persists a new one. The generated source is plain, auditable arithmetic over pre-extracted inputs — no eval
+of patient data — written to `<memory>/tools/<name>@<version>.py`.
 
-- Frailty Index Calculator
-- Secondary Infection Risk Classifier
-- Environmental and Medication Access Rules
-- What-if Scenario Template
-- Structured Human Handoff Template
+Instruments for the pneumonia use case:
+
+- `frailty_index_calculator`
+- `secondary_infection_risk_classifier`
+- `environmental_medication_access_rules`
+
+On a fresh service line these are generated (cold start). On every subsequent run they are reused, and the
+`FactoryReport` records `engineering_steps_saved` — the acceleration curve.
 
 ### Plan
 
@@ -41,7 +49,11 @@ Creates the auditable discharge-readiness trace:
 
 ### Analyze
 
-Scores the synthetic case and runs recursive checks. The demo uses deterministic scoring so the architecture is inspectable and testable.
+Scores the case with the generated instruments, then runs a **recursive validation loop to a fixed point**
+(`runtime.recursive_validation`): each pass may add review triggers (high-band domains, borderline infection with
+pending cultures, elevated access risk) and completeness flags (unknown procalcitonin, low room-air SpO2) until no
+new finding fires. The iteration count is reported in `analyze_iterations`. Scoring is deterministic so the
+architecture is inspectable and testable.
 
 ### Simulate
 

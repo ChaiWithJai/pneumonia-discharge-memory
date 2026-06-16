@@ -1,0 +1,45 @@
+{
+  "patient_id": "synthetic-pna-002-low-risk",
+  "age": 54,
+  "diagnosis": "community_acquired_pneumonia",
+  "length_of_stay_days": 2,
+  "prior_admissions_6_months": 0,
+  "comorbidities": [],
+  "vitals": {
+    "afebrile_hours": 60,
+    "oxygen_saturation_room_air": 96.0,
+    "respiratory_rate": 16,
+    "heart_rate": 78,
+    "systolic_bp": 122
+  },
+  "labs": {
+    "wbc_current": 8.1,
+    "wbc_48h_delta": -0.6,
+    "procalcitonin_trend": "falling",
+    "cultures_pending": false
+  },
+  "meds": {
+    "antibiotics_ordered": true,
+    "oral_stepdown_ready": true,
+    "med_access_risk": "low",
+    "adherence_concern": false
+  },
+  "social": {
+    "zip_code": "10025",
+    "lives_alone": false,
+    "caregiver_available": true,
+    "health_literacy_risk": "low",
+    "pharmacy_access_minutes": 8,
+    "home_health_eligible": false
+  },
+  "mobility": {
+    "baseline_independent": true,
+    "current_mobility_drop": "none",
+    "falls_last_6_months": 0,
+    "nutrition_risk": "low"
+  },
+  "notes": [
+    "Synthetic low-risk case for demo only.",
+    "Stable vitals, strong support, easy medication access."
+  ]
+}

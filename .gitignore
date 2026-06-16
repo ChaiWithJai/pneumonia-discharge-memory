@@ -1,4 +1,5 @@
 .venv/
+node_modules/
 __pycache__/
 *.pyc
 .pytest_cache/
@@ -6,5 +7,11 @@ dist/
 build/
 *.egg-info/
 examples/memory/*.jsonl
+examples/memory/web/
+examples/memory/web_runtime/
+examples/memory/institutional/
+examples/memory/proof/
 outputs/
-
+.playwright-mcp/
+package-lock.json
+node_modules/

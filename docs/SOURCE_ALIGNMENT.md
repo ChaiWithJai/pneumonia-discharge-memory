@@ -26,12 +26,12 @@ This repo implements those concepts as:
 
 The runtime maps the HOMER-1 states into code:
 
-- Factory: `factory_instruments()`
+- Factory: `factory.assemble()` (generate-or-reuse executable instruments)
 - Plan: `plan_trace()`
-- Analyze: `score_case()` and `recursive_checks()`
+- Analyze: `AssembledFactory.score()` and `recursive_validation()`
 - Simulate: `generate_whatif_scenarios()`
 - Output: `handoff()`
-- Persist: `memory_event()` and `append_memory()`
+- Persist: `InstitutionalMemory.record_case()` and persisted tool artifacts
 
 ## Local AI Source Alignment
 

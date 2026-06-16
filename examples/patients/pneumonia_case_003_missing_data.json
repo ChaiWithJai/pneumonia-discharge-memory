@@ -1,0 +1,45 @@
+{
+  "patient_id": "synthetic-pna-003-missing-data",
+  "age": 68,
+  "diagnosis": "community_acquired_pneumonia",
+  "length_of_stay_days": 3,
+  "prior_admissions_6_months": 1,
+  "comorbidities": ["diabetes"],
+  "vitals": {
+    "afebrile_hours": 50,
+    "oxygen_saturation_room_air": 91.0,
+    "respiratory_rate": 19,
+    "heart_rate": 92,
+    "systolic_bp": 118
+  },
+  "labs": {
+    "wbc_current": 12.0,
+    "wbc_48h_delta": 0.5,
+    "procalcitonin_trend": "unknown",
+    "cultures_pending": true
+  },
+  "meds": {
+    "antibiotics_ordered": true,
+    "oral_stepdown_ready": false,
+    "med_access_risk": "moderate",
+    "adherence_concern": false
+  },
+  "social": {
+    "zip_code": "11201",
+    "lives_alone": true,
+    "caregiver_available": false,
+    "health_literacy_risk": "moderate",
+    "pharmacy_access_minutes": 20,
+    "home_health_eligible": true
+  },
+  "mobility": {
+    "baseline_independent": true,
+    "current_mobility_drop": "mild",
+    "falls_last_6_months": 0,
+    "nutrition_risk": "moderate"
+  },
+  "notes": [
+    "Synthetic borderline case with a data gap (procalcitonin unknown).",
+    "Exercises the completeness branch of the recursive validation loop."
+  ]
+}

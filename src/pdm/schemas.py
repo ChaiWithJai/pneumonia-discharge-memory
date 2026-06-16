@@ -118,11 +118,70 @@ class HandoffRecommendation(BaseModel):
     clinician_note: str
 
 
+# --- Generative toolchain assembly (the HOMER-1 "Factory") ---------------------
+#
+# A ToolRule is a typed, code-generatable scoring primitive. The Factory turns a
+# list of these into *executable Python source*, validates it, persists it to
+# institutional memory, and reuses it on later runs. No free-form eval: every
+# rule compiles to explicit, auditable arithmetic over pre-extracted inputs.
+
+
+class ToolRule(BaseModel):
+    input: str  # dotted path into PatientCase, e.g. "labs.wbc_current"
+    kind: Literal["threshold", "flag", "map", "scaled"]
+    op: Literal[">=", ">", "<=", "<", "=="] = ">="
+    threshold: float | None = None
+    weight: float = 0.0
+    mapping: dict[str, float] | None = None
+    cap: float | None = None  # optional ceiling on this rule's contribution
+    interpretation: str = ""
+    source_label: str = "synthetic case"
+    surface_evidence: bool = False
+
+
+class ToolSpec(BaseModel):
+    name: str
+    version: str
+    purpose: str
+    score_name: str
+    inputs: list[str]
+    rules: list[ToolRule]
+    moderate_threshold: float = 0.34
+    high_threshold: float = 0.67
+    validation_checks: list[str]
+    limitations: list[str]
+    origin: Literal["deterministic_blueprint", "bonsai_proposed"] = "deterministic_blueprint"
+
+
+class GeneratedTool(BaseModel):
+    name: str
+    version: str
+    spec: ToolSpec
+    source_code: str
+    generated_by: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    run_index: int
+    validation_passed: bool
+    validation_report: list[str] = Field(default_factory=list)
+
+
+class FactoryReport(BaseModel):
+    run_index: int
+    tools_generated: list[str] = Field(default_factory=list)
+    tools_reused: list[str] = Field(default_factory=list)
+    engineering_steps_this_run: int = 0
+    engineering_steps_saved: int = 0
+    cumulative_tools_in_memory: int = 0
+
+
 class RuntimeResult(BaseModel):
     patient_id: str
+    run_index: int
     instruments: list[Instrument]
+    factory_report: FactoryReport
     trace: list[TraceStep]
     scores: list[Score]
+    analyze_iterations: int = 1
     scenarios: list[WhatIfScenario]
     handoff: HandoffRecommendation
     institutional_memory_event: dict[str, Any]
