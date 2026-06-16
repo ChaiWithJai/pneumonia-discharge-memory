@@ -1,0 +1,129 @@
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from enum import Enum
+from typing import Any, Literal
+
+from pydantic import BaseModel, Field
+
+
+class RuntimeState(str, Enum):
+    FACTORY = "factory"
+    PLAN = "plan"
+    ANALYZE = "analyze"
+    SIMULATE = "simulate"
+    OUTPUT = "output"
+    PERSIST = "persist"
+
+
+class VitalTrend(BaseModel):
+    afebrile_hours: int = Field(ge=0)
+    oxygen_saturation_room_air: float = Field(ge=0, le=100)
+    respiratory_rate: int = Field(ge=0)
+    heart_rate: int = Field(ge=0)
+    systolic_bp: int = Field(ge=0)
+
+
+class LabTrend(BaseModel):
+    wbc_current: float = Field(ge=0)
+    wbc_48h_delta: float
+    procalcitonin_trend: Literal["falling", "flat", "rising", "unknown"] = "unknown"
+    cultures_pending: bool = False
+
+
+class MedicationContext(BaseModel):
+    antibiotics_ordered: bool
+    oral_stepdown_ready: bool
+    med_access_risk: Literal["low", "moderate", "high"]
+    adherence_concern: bool = False
+
+
+class SocialContext(BaseModel):
+    zip_code: str
+    lives_alone: bool = False
+    caregiver_available: bool = False
+    health_literacy_risk: Literal["low", "moderate", "high"] = "moderate"
+    pharmacy_access_minutes: int = Field(ge=0, default=20)
+    home_health_eligible: bool = False
+
+
+class MobilityContext(BaseModel):
+    baseline_independent: bool
+    current_mobility_drop: Literal["none", "mild", "moderate", "severe"]
+    falls_last_6_months: int = Field(ge=0, default=0)
+    nutrition_risk: Literal["low", "moderate", "high"] = "moderate"
+
+
+class PatientCase(BaseModel):
+    patient_id: str
+    age: int = Field(ge=18)
+    diagnosis: Literal["community_acquired_pneumonia", "pneumonia_other"]
+    length_of_stay_days: int = Field(ge=0)
+    prior_admissions_6_months: int = Field(ge=0)
+    comorbidities: list[str] = Field(default_factory=list)
+    vitals: VitalTrend
+    labs: LabTrend
+    meds: MedicationContext
+    social: SocialContext
+    mobility: MobilityContext
+    notes: list[str] = Field(default_factory=list)
+
+
+class Instrument(BaseModel):
+    name: str
+    version: str
+    purpose: str
+    inputs: list[str]
+    validation_checks: list[str]
+    limitations: list[str]
+
+
+class EvidenceItem(BaseModel):
+    key: str
+    value: Any
+    source: str
+    interpretation: str
+
+
+class Score(BaseModel):
+    name: str
+    value: float
+    band: Literal["low", "moderate", "high"]
+    evidence: list[EvidenceItem] = Field(default_factory=list)
+
+
+class TraceStep(BaseModel):
+    state: RuntimeState
+    action: str
+    inputs: list[str] = Field(default_factory=list)
+    outputs: list[str] = Field(default_factory=list)
+    checks: list[str] = Field(default_factory=list)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class WhatIfScenario(BaseModel):
+    name: str
+    assumption: str
+    readmission_risk_delta: float
+    empathy_prompt: str
+    operational_trigger: str
+
+
+class HandoffRecommendation(BaseModel):
+    disposition: Literal["ready_with_supports", "delay_and_reassess", "clinician_review_required"]
+    summary: str
+    required_human_review: bool = True
+    actions_to_consider: list[str] = Field(default_factory=list)
+    red_flags: list[str] = Field(default_factory=list)
+    clinician_note: str
+
+
+class RuntimeResult(BaseModel):
+    patient_id: str
+    instruments: list[Instrument]
+    trace: list[TraceStep]
+    scores: list[Score]
+    scenarios: list[WhatIfScenario]
+    handoff: HandoffRecommendation
+    institutional_memory_event: dict[str, Any]
+

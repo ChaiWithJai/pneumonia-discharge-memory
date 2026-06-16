@@ -1,0 +1,46 @@
+{
+  "patient_id": "synthetic-pna-001",
+  "age": 82,
+  "diagnosis": "community_acquired_pneumonia",
+  "length_of_stay_days": 3,
+  "prior_admissions_6_months": 2,
+  "comorbidities": ["copd", "heart_failure", "diabetes"],
+  "vitals": {
+    "afebrile_hours": 36,
+    "oxygen_saturation_room_air": 91.0,
+    "respiratory_rate": 22,
+    "heart_rate": 104,
+    "systolic_bp": 104
+  },
+  "labs": {
+    "wbc_current": 13.8,
+    "wbc_48h_delta": 1.4,
+    "procalcitonin_trend": "flat",
+    "cultures_pending": true
+  },
+  "meds": {
+    "antibiotics_ordered": true,
+    "oral_stepdown_ready": false,
+    "med_access_risk": "high",
+    "adherence_concern": true
+  },
+  "social": {
+    "zip_code": "10453",
+    "lives_alone": true,
+    "caregiver_available": false,
+    "health_literacy_risk": "moderate",
+    "pharmacy_access_minutes": 42,
+    "home_health_eligible": true
+  },
+  "mobility": {
+    "baseline_independent": true,
+    "current_mobility_drop": "moderate",
+    "falls_last_6_months": 1,
+    "nutrition_risk": "high"
+  },
+  "notes": [
+    "Synthetic case for demo only.",
+    "Discharge team is considering home with oral antibiotics."
+  ]
+}
+
