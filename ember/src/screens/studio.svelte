@@ -1,14 +1,27 @@
 <script lang="ts">
   // THE STUDIO (Loop 4). With 1–2 pilot users we read 100% of traces. Also the
-  // operator's bench: dev time-travel to demonstrate the Hush/Return locally,
-  // and a check-in box to exercise the care-path gate.
+  // operator's bench: human-in-the-loop review (Loop 2), trace labeling that
+  // grows the eval set, dev time-travel to demo the Hush/Return, and a check-in
+  // box that exercises the care-path gate.
   import { ember } from "../lib/store.svelte";
-  import { studioStats } from "../lib/loops/studio";
+  import { studioStats, pendingCount, evalJSONL, toEvalCases } from "../lib/loops/studio";
 
   const traces = $derived(ember.allTraces());
   const stats = $derived(studioStats(traces));
-  const recent = $derived([...traces].reverse().slice(0, 12));
+  const pending = $derived(pendingCount(traces));
+  const evalCount = $derived(toEvalCases(traces).length);
+  const recent = $derived([...traces].reverse().slice(0, 14));
   let checkin = $state("");
+
+  function exportEvals() {
+    const blob = new Blob([evalJSONL(traces)], { type: "application/x-ndjson" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "ember-evals.jsonl";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 </script>
 
 <div class="scene">
@@ -18,7 +31,9 @@
     <span class="chip">{stats.total} traces</span>
     <span class="chip">rubric pass {Math.round(stats.passRate * 100)}%</span>
     <span class="chip">care-routed {stats.careRouted}</span>
+    <span class="chip">{evalCount} eval cases</span>
   </div>
+
   {#if Object.keys(stats.byRule).length}
     <div class="card">
       <span class="eyebrow">Rubric violations by rule</span>
@@ -27,6 +42,26 @@
       {/each}
     </div>
   {/if}
+
+  <div class="card">
+    <span class="eyebrow">Loop 2 — human in the loop</span>
+    <button class="toggle" style="margin-top:8px" onclick={() => ember.setReviewMode(!ember.reviewMode)}>
+      <span>
+        <strong>Review mode</strong>
+        <span class="faint" style="display:block;font-size:13px">New outputs are marked pending for an operator. Off = the rubric earns trust.</span>
+      </span>
+      <span class="switch" class:on={ember.reviewMode}></span>
+    </button>
+    {#if pending}
+      <div class="row" style="justify-content:space-between;margin-top:10px">
+        <span class="chip" style="color:var(--ember-soft)">{pending} awaiting review</span>
+        <button class="btn" style="padding:6px 12px" onclick={() => ember.clearPending()}>Approve all</button>
+      </div>
+    {/if}
+    <button class="btn btn-block" style="margin-top:10px" onclick={exportEvals} disabled={!evalCount}>
+      Export eval set ({evalCount} cases, JSONL)
+    </button>
+  </div>
 
   <div class="card">
     <span class="eyebrow">Care gate — type a check-in</span>
@@ -46,7 +81,7 @@
     </div>
   </div>
 
-  <span class="eyebrow">Recent traces</span>
+  <span class="eyebrow">Recent traces — label to grow the eval set</span>
   <div class="stack">
     {#each recent as t (t.id)}
       <div class="card">
@@ -57,6 +92,11 @@
           </span>
         </div>
         <p style="margin-top:6px;font-size:14px">{t.output}</p>
+        <div class="row" style="margin-top:8px;gap:8px">
+          <button class="btn" style="padding:6px 12px" class:label-on={t.label === "good"} onclick={() => ember.labelTrace(t.id, "good")}>good</button>
+          <button class="btn" style="padding:6px 12px" class:label-on={t.label === "bad"} onclick={() => ember.labelTrace(t.id, "bad")}>bad</button>
+          {#if t.reviewed === false}<span class="chip" style="color:var(--ember-soft)">pending</span>{/if}
+        </div>
       </div>
     {/each}
     {#if !recent.length}<p class="faint">No traces yet.</p>{/if}
@@ -65,3 +105,10 @@
   <div class="spacer"></div>
   <button class="btn btn-block" onclick={() => ember.go("F4")}>Back</button>
 </div>
+
+<style>
+  .label-on {
+    border-color: var(--good);
+    color: var(--good);
+  }
+</style>

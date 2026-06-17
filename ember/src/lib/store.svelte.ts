@@ -81,6 +81,10 @@ class EmberApp {
   // dev: time travel so the Hush/Return is demonstrable without waiting days
   clockOffsetMs = $state(0);
 
+  // Loop 2 — human-in-the-loop. When on, new utterances are marked pending for
+  // an operator to review (the pilot discipline). Off = the rubric earns trust.
+  reviewMode = $state(false);
+
   private store = new LocalStorageStore();
   private source: PassiveSource = new SimulatedSource(7);
   private traces: Trace[] = [];
@@ -300,7 +304,8 @@ class EmberApp {
       { careSignal: careText ? { text: careText } : undefined },
     );
     this.utterance = { kind: u.kind, text: u.text };
-    this.traces = [...this.traces, u.trace].slice(-500);
+    const trace = { ...u.trace, reviewed: !this.reviewMode };
+    this.traces = [...this.traces, trace].slice(-500);
     this.store.saveTraces(this.traces);
     if (u.kind === "care") {
       this.careResources = CARE_RESOURCES;
@@ -338,6 +343,23 @@ class EmberApp {
   setTemperament(id: TemperamentId): void {
     if (!this.save) return;
     this.commit({ ...this.save, ember: { ...this.save.ember, temperament: id } });
+  }
+
+  // ---- Loop 2/4 — operator review + the growing eval set ----
+  setReviewMode(on: boolean): void {
+    this.reviewMode = on;
+  }
+  labelTrace(id: string, label: "good" | "bad"): void {
+    this.traces = this.traces.map((t) =>
+      t.id === id ? { ...t, label, reviewed: true } : t,
+    );
+    this.store.saveTraces(this.traces);
+  }
+  clearPending(): void {
+    this.traces = this.traces.map((t) =>
+      t.reviewed === false ? { ...t, reviewed: true } : t,
+    );
+    this.store.saveTraces(this.traces);
   }
 
   // ---- the Ledger ----
