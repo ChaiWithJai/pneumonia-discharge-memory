@@ -1,196 +1,234 @@
 # Biometric Companion (Coherence Tamagotchi) — Design Spec
 
-- **Date:** 2026-06-17
+- **Date:** 2026-06-17 (rev. 2 — adds iOS/HealthKit default, Whoop/Oura/Strava integrations, Strava beachhead, tiered power-ups)
 - **Status:** Draft (design); pending direction sign-off → implementation plan
-- **Scope:** A new product surface that reuses this repo's engine patterns — generative blueprint seam, compounding append-only memory, offline-first adapters, a discrete emotion-driven state machine, and on-device Bonsai imaging — to build a **connected biometric companion**. A single creature you *guard*: it blooms on your regulated nervous-system state and rests (never dies, never nags) when the signal is gone. Its growth is logged as a living **dex of your own coherence states**, and it evolves along an **extensible species taxonomy**. App-first (web/PWA) on the current stack, with every external dependency behind an interface so a wearable or dedicated carried object can bind to the same seams later.
-- **Non-clinical:** This is a wellbeing companion, not a medical device. HRV/coherence is framed as practice feedback, never diagnosis. No biometric data leaves the device.
+- **Scope:** A connected biometric companion that reuses this repo's engine patterns — generative blueprint seam, compounding append-only memory, offline-first adapters, a discrete emotion-driven state machine, and on-device Bonsai imaging. A single creature you *guard*: it blooms on your regulated nervous-system state and rests (never dies, never nags) when the signal is gone. Its growth is logged as a living **dex of your own states**, and it evolves along an **extensible species taxonomy**. **iOS-first via HealthKit**, with a **universal heart-data core that runs on any device** and **brand-specific power-ups** unlocked by connecting Whoop, Oura, and Strava. Every signal source is an adapter behind one interface, so capability degrades and upgrades gracefully and a future dedicated object binds to the same seam.
+- **Beachhead:** monthly-active **Strava** users who log several activity types (see §2).
+- **Non-clinical:** a wellbeing companion, not a medical device. HRV/coherence is practice feedback, never diagnosis.
 
 ---
 
 ## 0. Directing decisions (locked)
 
-The four open directing questions from the brief are resolved as follows, and the rest of this spec follows from them:
-
 | Question | Decision | Consequence |
 |---|---|---|
-| **Bond** | **Guardianship only** — it always needs you. | Keep dependency-as-meaning; *invert the punishment*. No death, no nagging, no neglect-guilt. Absence → the companion **rests**; it re-blooms the instant you return to coherence. The dependency is "it can only bloom *through your regulated state*," not "it suffers when you leave." |
-| **Collection** | **One deep companion + a dex of your own states.** | The "collection" is Pokémon's *dex-as-living-journal* pointed inward — your sessions/states are the documented, growing record. No creature-collecting, no scarcity, no gacha. |
-| **Form factor** | **App-first now, object-ready seam.** | Ship as an installable PWA on the current Svelte + stdlib-server stack; biometrics arrive through a `BiometricSource` interface. A wearable bridge or dedicated object binds to the same interface later with zero engine changes. |
-| **Fiction** | **Extensible taxonomy now.** | Author an initial species/evolution tree as *data* through a `blueprint_species()` seam (the Factory pattern, reused). The world grows by adding `SpeciesSpec`s — "ship the seam, grow with SKUs." |
+| **Bond** | **Guardianship only** — it always needs you. | Keep dependency-as-meaning; *invert the punishment*. No death, no nagging, no neglect-guilt. Absence → the companion **rests**; it re-blooms the instant your signal returns. The dependency is "it can only bloom *through your regulated/recovered state*," not "it suffers when you leave." |
+| **Collection** | **One deep companion + a dex of your own states.** | The "collection" is Pokémon's *dex-as-living-journal* pointed inward — your sessions, recoveries, and activities are the documented, growing record. No creature-collecting, no scarcity, no gacha. |
+| **Form factor** | **iOS-first (HealthKit) + universal core + brand power-ups; object-ready seam.** | Ship a native-wrapped iOS app reading HealthKit on-device. A **universal core** runs on basic heart data available everywhere; connecting **Whoop / Oura / Strava** lights up **brand power-ups**. Each provider is one `SignalSource` adapter; a future wearable/object is just another adapter. |
+| **Fiction** | **Extensible taxonomy now.** | Author an initial species/evolution tree as *data* through a `blueprint_species()` seam (the Factory pattern, reused). The world grows by adding `SpeciesSpec`s — "ship the seam, grow with SKUs." Brand integrations map onto the branches (§7). |
 
-**The synthesis we are building:** Tamagotchi's *meaningful dependency* + Pokémon's *mutual growth and living dex* + the collectible's *portability and projection* — fed by a real interior signal (HRV-derived coherence) and stripped of all three shadows (guilt, gacha, manufactured scarcity). The anti-extraction stance is the wedge, exactly as the AI-collectible category fails to be.
+**The synthesis we are building:** Tamagotchi's *meaningful dependency* + Pokémon's *mutual growth, living dex, and connection-as-completion* + the collectible's *portability and projection* — fed by a real interior signal and stripped of all three shadows (guilt, gacha, manufactured scarcity). The anti-extraction stance is the wedge.
+
+> **Constraint, addressed.** The original brief was "no DB, local storage only, strong dependency inversion." HealthKit and the universal core keep that covenant — fully on-device. **Whoop/Oura/Strava are OAuth 2.0 APIs with client secrets, refresh tokens, rate limits, and activity webhooks** that cannot run client-side, so brand power-ups need a **thin token broker**. We resolve this with a **Cloudflare Workers** backend (§11): serverless, no boxes to manage, with only a small encrypted store for refresh tokens — preserving the *spirit* of "minimal infra" rather than standing up a real DB. The core loop stays fully local; only the integration plane lives in the Worker.
 
 ---
 
 ## 1. Purpose
 
-Most "AI companions" bond you to manufactured scarcity (blind boxes, FOMO tickets) or to obedience (feed-me-or-I-die). This one bonds to your **real interior state**. The core fiction, in one sentence (the Tamagotchi "ship one sentence of lore" lesson): *the egg is the field of your attention; the atmosphere it needs to hatch and bloom is your coherence.* You co-regulate; you don't caretake. The product proves the same thesis this repo already proves for clinical reasoning — that **intelligence/feeling should compound** — applied to a personal nervous-system practice: every session is logged, the companion grows as the practitioner does, and the record is yours and local.
+Most "AI companions" bond you to manufactured scarcity (blind boxes, FOMO tickets) or to obedience (feed-me-or-I-die). This one bonds to your **real interior state**. The core fiction, in one sentence: *the egg is the field of your attention; the atmosphere it needs to hatch and bloom is your coherence and recovery.* You co-regulate; you don't caretake. It proves the same thesis this repo proves for clinical reasoning — **feeling and intelligence should compound** — applied to a personal physiological practice: every session, recovery, and activity is logged; the companion grows as the practitioner does; the record is theirs.
 
-This is a reference implementation / work sample. Synthetic and live biometric signals demonstrate the architecture; no data leaves the device; nothing here is medical advice.
+## 2. Beachhead market & go-to-market wedge
 
-## 2. Actors & Jobs-to-be-Done
+**Target: monthly-active Strava users who log several activity types.** Why this segment is the right first network:
 
-| Actor | Job (when / want / so) | "Done" test |
-|---|---|---|
-| **Practitioner** (primary) | When I want to settle my nervous system, I want a companion that visibly responds to my real coherence, so the practice feels like a relationship, not a chore. | From any screen I know my companion's state, whether my signal is live, and the one next action. The session loop needs zero instruction. |
-| **The companion** (the point) | When the practitioner is regulated, I want to bloom and grow; when they're away, I want to rest gracefully, so the bond is meaningful without being coercive. | It never shames, never dies, never nags. Returning to coherence always revives it within seconds. |
-| **The returning self** (downstream) | When I look back, I want a living dex of my states and my companion's growth, so I can see the arc of my own practice. | One scannable timeline; export + delete my whole record in one action. |
-| **Future surfaces** (wearable / object / cohort) | When new hardware or a social graph arrives, I want to bind to the existing engine, so we don't rewrite the core. | A new `BiometricSource` / `CompanionStore` implementation drops in at the composition root; the engine is untouched. |
+- **Habit already exists.** They open an app to *close the loop* on physical effort monthly+ — we attach meaning to a ritual they already keep, instead of manufacturing a new one.
+- **Identity-invested & multi-modal.** Multi-sport loggers (run + ride + swim + strength…) are exactly the users our **variety** evolution gate rewards (§6 `EvolveRule.minVariety`); their diverse data makes the companion's growth visibly richer than a single-sport user's. The product's depth lands hardest on precisely this person.
+- **Comfortable connecting apps.** Strava's whole culture is third-party connection (it's a hub, not a silo), so an OAuth "connect Strava" ask is native to the behavior — low friction for our first integration.
+- **A social graph to grow into.** Strava is itself a social product. It gives us a credible, *non-extractive* path to Pokémon's **connection-as-completion** moat later (cohorts, shared blooms, kudos→care) without inventing a network from scratch. We defer building social in v1 but the beachhead makes it reachable.
+- **Movement-led branch is the lead persona.** Strava data feeds the *Ember* (movement-led) evolution branch (§7), so the beachhead, the signal, and the fiction all point the same way.
 
-**Usability contract:** self-evident screens; the live session is the loudest thing on the screen; the companion's state is always legible; no streak-shaming, no dark patterns, no instructional paragraphs.
+**Wedge sequence:** universal core (any device, basic HR) → **Strava power-up** (the beachhead unlock) → Oura/Whoop power-ups (recovery depth) → HealthKit as the iOS substrate beneath all of it → (fast-follow) Strava-graph social.
 
 ## 3. The bond, made literal (the inversion)
 
 Tamagotchi made *mortality* the mechanic and *guilt* the shadow. We keep the dependency and delete the punishment:
 
-- **Bloom, not survival.** The companion has a continuous `vitality` that rises with sustained coherence and gently decays toward **rest** (not death) in its absence. Rest is a restful visual state (curled, dim, breathing slowly), not a sick or dying one.
-- **Instant revival.** The first coherent breaths after any absence visibly revive it. There is no penalty, no "you neglected me," no lost progress. Long-term growth (level, dex, evolution) is **monotonic** — it never regresses.
-- **Dependency as meaning, relocated.** It still needs you absolutely — but what it needs is your *regulated state*, available any time you choose to give it, not your obedience to a clock. That is the entire ethical pivot.
+- **Bloom, not survival.** A continuous `vitality` rises with regulated/recovered state and gently decays toward **rest** (not death) in its absence. Rest is restful (curled, dim, slow-breathing), never sick or dying.
+- **Instant revival.** The first good signal after any absence — a coherent breathing session, a logged activity, a solid recovery score — visibly revives it. No penalty, no "you neglected me," no lost progress. Long-term growth (level, dex, evolution) is **monotonic**.
+- **Dependency as meaning, relocated.** It still needs you absolutely — but what it needs is your *regulated and recovered physiology*, given when you choose, not your obedience to a clock.
 
-## 4. The signal: from biometrics to coherence
+## 4. The signal: from biometrics to nourishment
 
-The companion is driven by one derived scalar, **coherence ∈ [0,1]**, plus a coarse **arousal** read (calm ↔ activated). Computed deterministically from the raw stream so the engine is inspectable and unit-testable, exactly like the clinical scorer.
+The companion eats one derived currency — **nourishment** — synthesized from three signal classes, each from a different source tier. All derived deterministically so the engine is inspectable and unit-testable, like the clinical scorer.
 
-- **Raw input** — `BiometricSample { t, rrIntervalsMs?: number[], heartRateBpm?: number, source }`. RR intervals (inter-beat intervals) are the gold input; bare heart rate is the degraded fallback.
-- **Coherence** — resonance of the heart-rhythm pattern: power concentrated in the ~0.1 Hz band during paced breathing (the HeartMath-style resonance read), combined with short-window HRV (RMSSD). High, smooth, sinusoidal HRV → high coherence.
-- **Arousal** — heart rate relative to a personal resting baseline + HRV suppression → a calm/activated read for mood/color.
-- **Windows** — instantaneous (companion's live reaction, ~5 s), session (the bloom earned), lifetime (dex + growth).
-- **No raw stream is persisted by default** — only derived per-session summaries land in the dex. (See §13.)
+| Signal class | What it is | Primary sources | Feeds branch |
+|---|---|---|---|
+| **Coherence** (active) | Real-time heart-rhythm resonance during paced breathing — ~0.1 Hz power + short-window HRV (RMSSD). | Universal core: live HR/RR via HealthKit, Bluetooth strap, or camera-PPG. | Breath-led (*Tidewalker*) |
+| **Recovery** (passive, daily) | Overnight HRV, resting HR, readiness/recovery, sleep quality. | Oura readiness, Whoop recovery, HealthKit HRV/sleep. | Stillness-led (*Lumen*) |
+| **Effort & rebound** (episodic) | Activity load, variety, and **HR recovery** after exertion. | Strava activities + HR streams, HealthKit workouts, Whoop strain. | Movement-led (*Ember*) |
+
+- **Raw types** — `HrSample { t, rrIntervalsMs?, heartRateBpm? }`; `DailyReadiness { date, hrvMs, restingHr, score }`; `ActivitySummary { id, type, durationS, hrStream?, hrRecoveryBpm? }`.
+- **`NourishmentScore`** — `{ coherence, recovery, effort, variety, confidence, t }`, each 0..1; `confidence` lets the UI honestly show "weak/partial signal" (camera-PPG, or no integration) without faking data.
+- **Windows** — instantaneous (live reaction), session/day (the bloom earned), lifetime (dex + growth).
+- **No raw stream persisted by default** — only derived summaries land in the dex (§12).
 
 These are wellbeing signals, not diagnostics. We never label arrhythmia, never alarm, never advise.
 
-## 5. Abstraction (module layers; dependencies point inward to the engine)
+## 5. Capability tiers (universal core + brand power-ups)
 
-The core engine is **pure, deterministic TypeScript** (the signal is inherently client-side: Web Bluetooth / camera / real-time UI). Every I/O concern is an interface injected at a single composition root, mirroring this repo's existing `available()` adapters (`src/pdm/local_ai.py`) and the Factory blueprint seam (`src/pdm/factory.py:blueprint_specs`). Strong dependency inversion is the explicit design constraint.
+A first-class **progressive-capability model** — the natural extension of this repo's `available()` adapter philosophy. The app detects what's connected and lights up power-ups; nothing is gated behind payment, only behind *what data the user chooses to share*.
+
+| Tier | Requires | Companion capability unlocked |
+|---|---|---|
+| **T0 — Universal core** | Basic heart data on any device (HealthKit / Bluetooth strap / camera-PPG). | The full bond: live coherence sessions, bloom/rest, the dex, the Breath-led branch. **The product is complete and meaningful at T0.** |
+| **T1 — Strava power-up** *(beachhead)* | Connect Strava (OAuth). | Activities nourish the companion; **HR-recovery** and **variety** mechanics; the Movement-led (*Ember*) branch; per-activity-type "expressions." |
+| **T1 — Oura power-up** | Connect Oura. | Passive overnight **recovery** nourishment; the Stillness-led (*Lumen*) branch; "wakes up rested" mornings. |
+| **T1 — Whoop power-up** | Connect Whoop. | Strain + recovery balance; recovery-gated evolution flourishes; "earned rest" mechanic. |
+| **T2 — Stacked** | Multiple integrations. | Cross-signal blooms (e.g., hard Strava effort + strong Oura recovery → a rare radiant state); fuller dex; faster, more-branched evolution. |
+
+**Power-ups add capability; they never ration the core.** This is the explicit anti-extraction posture: a free, device-only user has a real companion; integrations make it *richer*, not *un-crippled*.
+
+## 6. Abstraction (module layers; dependencies point inward to the engine)
+
+The core engine is **pure, deterministic TypeScript** (the live signal is client-side; the UI must react in real time). Every I/O concern is an interface injected at one composition root, mirroring the repo's `available()` adapters (`src/pdm/local_ai.py`) and the Factory blueprint seam (`src/pdm/factory.py:blueprint_specs`).
 
 | Module (proposed) | New? | Single purpose | Mirrors today |
 |---|---|---|---|
-| `app/src/lib/companion/coherence.ts` | new | Pure functions: `BiometricSample[] → CoherenceScore`. No I/O. | `runtime.py` deterministic scoring |
-| `app/src/lib/companion/engine.ts` | new | Pure reducer: `(CompanionState, CoherenceScore, dt) → CompanionState`. Short-term mood + long-term growth/evolution gates. | `runtime.recursive_validation` (deterministic, testable) |
-| `app/src/lib/companion/species.ts` | new | `blueprint_species(): SpeciesSpec[]` — the taxonomy + evolution rules as **data**. Swap for a model-proposed spec with deterministic fallback. | `factory.blueprint_specs()` — *the seam* |
-| `app/src/lib/companion/types.ts` | new | Typed contracts (samples, scores, state, species, dex entries). | `app/src/lib/types.ts` |
-| **`BiometricSource`** (interface) | new | `available(): Promise<bool>` · `start(cb)` · `stop()`. Impls: `SimulatedSource`, `WebBluetoothHeartRateSource`, `CameraPpgSource`; later `WearableBridgeSource` / `ObjectSource`. | `BonsaiWriter.available()` / `BonsaiImageStudio.available()` adapter idiom |
-| **`CompanionStore`** (interface) | new | Append-only persistence: `appendDexEntry`, `loadCompanion`, `saveCompanion`, `exportAll`, `wipe`. Impls: `LocalStorageStore` (v1), later `IndexedDbStore` / `RemoteStore`. | `InstitutionalMemory` append-only JSONL |
-| **`CompanionImager`** (interface) | new | `render(state): Promise<Blob>`. Impls: `CanvasImager` (offline, synchronous), `BonsaiImager` (via the existing `/illustrate` proxy). | what-if frame: Bonsai render with canvas fallback |
-| `app/src/lib/companion/store.svelte.ts` | new | Svelte 5 `$state` machine for the UI FSM (C0–C6) + composition root that injects the chosen impls. | `app/src/lib/store.svelte.ts` (`Conference`) |
-| `src/pdm/web.py` | extend | Serve the PWA (already does); keep `/illustrate` proxy; add PWA headers + companion image prompt. No new state on the server. | existing stdlib server + Bonsai proxy |
-| *(optional)* `src/pdm/companion/` | later | A Python mirror of `coherence` + `engine` + a proof harness, for the deterministic-proof culture you already keep. | `proof.py` |
+| `companion/coherence.ts` | new | Pure: `HrSample[] → coherence/arousal`. No I/O. | `runtime.py` scoring |
+| `companion/nourish.ts` | new | Pure: signal classes → `NourishmentScore`. | `runtime` scoring |
+| `companion/engine.ts` | new | Pure reducer: `(CompanionState, NourishmentScore, dt) → CompanionState`; mood + growth + evolution gates. | `recursive_validation` |
+| `companion/species.ts` | new | `blueprint_species(): SpeciesSpec[]` — taxonomy + evolution rules as **data**; model-proposed with deterministic fallback. | `factory.blueprint_specs()` — *the seam* |
+| `companion/types.ts` | new | Typed contracts. | `app/src/lib/types.ts` |
+| **`SignalSource`** (interface) | new | `available()` · `start(cb)` / `fetch()` · `stop()` · `capabilities`. Impls: `HealthKitSource`, `BluetoothHrSource`, `CameraPpgSource` (live HR); `StravaSource`, `OuraSource`, `WhoopSource` (integration). Each declares which signal classes it provides. | `BonsaiWriter/ImageStudio.available()` |
+| **`CompanionStore`** (interface) | new | Append-only local persistence: `appendDexEntry`, `load/saveCompanion`, `exportAll`, `wipe`. Impls: `LocalStorageStore`/`IndexedDbStore` (device), later `RemoteStore`. | `InstitutionalMemory` JSONL |
+| **`CompanionImager`** (interface) | new | `render(state) → image`. Impls: `CanvasImager` (offline), `BonsaiImager` (via `/illustrate`). | what-if frame + fallback |
+| **`IntegrationBroker`** (interface; impl = **Cloudflare Worker**) | new | OAuth token exchange/refresh + webhook ingest + rate-limited fetch for Strava/Oura/Whoop. Returns *derived* summaries to the device; never the engine's home. BFF token-broker, served from the edge. | *(new — the one backend piece; see §11)* |
+| `companion/store.svelte.ts` | new | Svelte 5 `$state` FSM (C0–C6) + composition root injecting the chosen impls. | `app/src/lib/store.svelte.ts` |
+| `src/pdm/web.py` | extend | Serve the app; keep `/illustrate`; host a **local dev broker** (fixture-backed `IntegrationBroker` for offline/CI). Production broker is the Cloudflare Worker (§11). | stdlib server + proxy |
+| *(optional)* `src/pdm/companion/` | later | Python mirror of `coherence`/`nourish`/`engine` + proof harness. | `proof.py` |
 
-**No cycles.** Data flow: `BiometricSource → coherence.ts → engine.ts → store (UI state) → CompanionImager (render) + CompanionStore (persist dex/growth)`. Everything below the engine is replaceable; the engine knows only interfaces.
+**No cycles.** Device flow: `SignalSource → coherence/nourish → engine → store (UI) → Imager + CompanionStore`. Integration flow: `device → IntegrationBroker (OAuth + fetch/webhook) → derived summary → SignalSource adapter → same engine`. The engine knows only interfaces; HealthKit (local) and Strava (brokered) are indistinguishable to it.
 
-## 6. Data model (`companion/types.ts`)
+## 7. Data model & taxonomy
 
-- `BiometricSample`: `{ t: number, rrIntervalsMs?: number[], heartRateBpm?: number, source: SourceKind }`.
-- `CoherenceScore`: `{ coherence: 0..1, arousal: 0..1, rmssdMs: number, confidence: 0..1, t }` — `confidence` lets the UI honestly show "weak signal" (e.g., camera PPG) without faking a reading.
-- `CompanionMood` (short-term enum): `DORMANT → STIRRING → SETTLING → COHERENT → RADIANT`. (Parallels `RuntimeState`; drives color/animation like the `EMOTION` map in today's store.)
-- `Companion`: `{ id, speciesId, stageId, level, vitality: 0..1, lifetimeCoherenceMinutes, streakDays, seed, bornAt }`. `seed` locks visual identity across renders/states (the seed-lock mechanic from the what-if spine).
-- `SpeciesSpec`: `{ id, name, oneLineLore, stages: StageSpec[], evolvesFrom?, branchOn?: ModalityWeights }`. Data, not code — the blueprint seam.
-- `StageSpec`: `{ id, name, promptScaffold, evolveWhen: EvolveRule }`.
-- `EvolveRule`: declarative gate — `{ minLifetimeMinutes, minStreakDays?, dominantModality?, minVariety? }`. Evolution is **outcome-uncertain** (Tamagotchi's pull): your *pattern of practice* shapes the branch; you don't pick it.
-- `DexEntry` (the living journal row): `{ t, durationS, peakCoherence, meanCoherence, coherenceMinutes, moodArc: CompanionMood[], modality, note? }`. Append-only.
-- `CompanionState` (engine's reducer state): `{ companion: Companion, mood: CompanionMood, instCoherence: number }`.
+**Core types** (`companion/types.ts`): `HrSample`, `DailyReadiness`, `ActivitySummary`, `NourishmentScore`, `CompanionMood` (`DORMANT→STIRRING→SETTLING→COHERENT→RADIANT`), `Companion { id, speciesId, stageId, level, vitality, lifetimeMinutes, streakDays, seed, bornAt }`, `SpeciesSpec`, `StageSpec`, `EvolveRule { minLifetimeMinutes, minStreakDays?, dominantModality?, minVariety? }`, `DexEntry { t, kind: "session"|"recovery"|"activity", summary, moodArc, modality }` (append-only).
 
-## 7. The taxonomy (initial canon, as data)
+**Initial taxonomy (data, illustrative)** — `blueprint_species()` returns:
+- **Base — "Mote"**: a spark of attention (the egg). Hatches on first nourishment.
+- **Branches by dominant modality**, which is exactly where the brand power-ups feed:
+  - **Breath-led → *Tidewalker*** (coherence; universal core / HealthKit live HR).
+  - **Stillness-led → *Lumen*** (recovery; Oura / Whoop / HealthKit sleep & HRV).
+  - **Movement-led → *Ember*** (effort & rebound; **Strava** / HealthKit workouts / Whoop strain).
+- **Stages gate on cumulative nourishment + consistency + variety** — never payment or rarity. Multi-source (T2) users can reach **hybrid/rare** stages (e.g., Ember×Lumen radiant) — the reward for a balanced practice, the anti-gacha source of "specialness."
 
-Authored up front per the "extensible taxonomy now" decision, but expressed entirely through `SpeciesSpec` data so adding to the world is a content change, not an engineering one. Illustrative starting tree (final art/names TBD with design):
-
-- **Base — "Mote"**: a spark of attention (the egg). Hatches on first sustained coherent session.
-- **Branch by dominant regulation modality** over the first stretch of practice (the engine tracks how you most often reach coherence):
-  - **Breath-led →** *Tidewalker* line (resonant ~0.1 Hz breathing; oceanic, tidal motion).
-  - **Stillness-led →** *Lumen* line (steady high-HRV stillness; luminous, slow).
-  - **Movement-led →** *Ember* line (coherence reached around active recovery / good HR recovery; warm, kinetic).
-- **Stages gate on cumulative coherence-minutes + consistency + variety** (`EvolveRule`), never on payment or rarity. A practitioner discovers their branch by practicing; that uncertainty is the engagement, ethically sourced.
-
-`blueprint_species()` returns this tree; a Bonsai model may later *propose* a species (`origin: "bonsai_proposed"`) with the deterministic blueprint as the safe fallback — exactly the Factory's spec-proposal pattern.
+`seed` locks visual identity across renders/states (the what-if seed-lock mechanic); evolution is outcome-uncertain (Tamagotchi's pull) and shaped by your real pattern of practice.
 
 ## 8. Finite-state machine (UI)
 
-Mirrors the existing S0–S8 conference FSM: a typed `State` union, an `EMOTION`/palette map, persistent chrome on every screen, and non-destructive Back. Persistent chrome: **companion avatar (live) · current mood · source status (live/weak/off) · lifetime coherence-minutes · streak (celebrated, never shamed)**.
+Mirrors the S0–S8 conference FSM: typed `State` union, palette/`EMOTION` map, persistent chrome, non-destructive Back. Chrome: **live companion · mood · connected sources & tier · lifetime minutes · streak (celebrated, never shamed)**.
 
 | State | Frontstage | Primary action → next |
 |---|---|---|
-| **C0 NEST** (lobby) | Companion at rest in its nest; warm dex summary ("you've practiced N minutes; it's a *Tidewalker*"). | Begin → C1 |
-| **C1 ATTUNE** | Choose the signal: detected Bluetooth strap / camera (experimental) / simulated. Shows `available()` per source, honestly. | Connect → C2 |
-| **C2 SESSION** (the core loop) | Full-bleed companion responding in real time to live coherence; optional paced-breathing guide; mood shifts DORMANT→…→RADIANT. The loudest screen. | End session → C3 |
-| **C3 BLOOM** | Session payoff: coherence earned, companion reaction, dex entry written, growth ticks (vitality, lifetime minutes, level). | See dex → C4 · or Again → C2 |
-| **C4 DEX** | The living journal: timeline of sessions/states, companion growth arc, progress toward next evolution. (The inward Pokédex.) | Back → C0 · evolution ready → C5 |
-| **C5 GROW** | Evolution moment when an `EvolveRule` fires: a seed-locked Bonsai render of the new form, lineage preserved. Monotonic — always a gain. | Continue → C4 |
-| **C6 ATLAS** (taxonomy surface) | The species atlas — what this companion could become, branch hints. Read-only world canon; grows as SKUs are added. | Back |
+| **C0 NEST** | Companion at rest; warm dex summary; "connect more to nourish it." | Begin → C1 |
+| **C1 ATTUNE** | Pick today's signal; show connected integrations + `available()` per source, honestly. **Connect Strava/Oura/Whoop** lives here (power-up tray). | Start → C2 |
+| **C2 SESSION** | The core loop: full-bleed companion reacting in real time to live coherence; optional paced-breathing guide. Loudest screen. | End → C3 |
+| **C3 BLOOM** | Payoff: nourishment earned (this session **and** any passive recovery/activity since last open), companion reaction, dex entry, growth ticks. | Dex → C4 · Again → C2 |
+| **C4 DEX** | Living journal: sessions + recoveries + activities timeline, growth arc, progress to next evolution. | Back → C0 · evolve-ready → C5 |
+| **C5 GROW** | Evolution moment: seed-locked Bonsai render of the new form, lineage preserved. Monotonic gain. | Continue → C4 |
+| **C6 ATLAS** | The species atlas — branches, brand-power-up hints ("connect Strava to walk the Ember path"). Read-only canon, grows with SKUs. | Back |
 
-**C3 → C2 is the practice loop;** each session starts the companion warmer (higher resting vitality, closer to next evolution). This is the compounding curve, re-skinned from the conference's S7→S2.
+**C3 → C2 is the practice loop;** each open starts the companion warmer, now also fed by *passive* recovery/activity ingested since last session.
 
 ## 9. On-device imaging (reuse the Bonsai spine)
 
-The companion is *seen* reacting — the collectible's "portability + projection" steal, but earned. Reuse the existing same-origin `/illustrate` proxy and dignity guardrails (`local_ai.IMAGE_GUARDRAILS`):
-
-- **Seed-locked identity:** `Companion.seed` feeds the studio `seed` param so the creature looks like *itself* across moods, states, and the dex (the what-if seed-lock mechanic).
-- **One prompt scaffold per stage** (`StageSpec.promptScaffold`) carrying species look + current mood + guardrails (no fear, no gore, no text — and here, nothing body-shaming or medicalized).
-- **Offline-first:** `CanvasImager` synchronously paints the creature from the same palette when the studio is down — no spinners, no dead ends, exactly like the clinical canvas fallback. Diffusion render is an *upgrade*, never required.
+Reuse the same-origin `/illustrate` proxy and dignity guardrails (`local_ai.IMAGE_GUARDRAILS`): seed-locked identity across moods/states/dex; one prompt scaffold per stage; `CanvasImager` synchronous fallback when the studio is down (no spinners). Brand expressions (e.g., an *Ember* form's post-run glow) are prompt modifiers, not separate assets. Diffusion is an upgrade, never required.
 
 ## 10. Technical feasibility
 
-| Capability | Approach | Feasibility |
+| Capability | Approach | Feasibility / risk |
 |---|---|---|
-| **HRV from a chest strap** | Web Bluetooth GATT Heart Rate Service (`0x180D`), characteristic `0x2A37` exposes RR intervals on straps like the Polar H10. Real coherence. | **Solid** on Chrome/Edge/Android. **Not** iOS Safari → object/native-later seam. |
-| **HR from the camera (rPPG)** | `getUserMedia` + green-channel photoplethysmography → heart rate; RR noisy. | **Experimental** — HR-grade only. Marked low-`confidence`; good demo fallback, weak HRV. |
-| **Simulated source** | Deterministic generator producing realistic RR series at chosen coherence levels. | **Trivial** — powers dev, tests, and the offline demo (the synthetic-cohort analogue). |
-| **Apple Health / wearables** | No web access to HealthKit. Needs a native bridge or export import. | **Future** — slots behind `BiometricSource`; primary reason form factor is "object-ready." |
-| **Persistence (no DB)** | `LocalStorageStore` implementing `CompanionStore` (companion JSON + append-only dex). Per your constraint. | **Trivial.** Dex is time-series and will grow → `IndexedDbStore` is the drop-in upgrade behind the same interface (recommended once sessions exceed ~hundreds). |
-| **Carried / installable** | PWA: web app manifest + service worker for offline + home-screen install. The "anti-phone" portability story, software-first. | **Solid** — server already serves `app/dist`; add manifest + SW. |
-| **Imaging** | Existing `/illustrate` proxy + canvas fallback. | **Already proven** in this repo. |
+| **iOS native + HealthKit** | Wrap the existing Svelte app in **Capacitor** (or Expo) and read HealthKit via a plugin — preserves the committed frontend + FSM, gains App Store distribution and Android later via the same shell. Full native Swift is the alternative (best HealthKit ergonomics, abandons the web app). | **Solid; recommend Capacitor.** HealthKit is read-only on-device, no backend. |
+| **Live HR / HRV core** | HealthKit (iOS); Web Bluetooth HR straps (Polar H10 → RR) on Android/desktop; camera-PPG fallback (HR only, low confidence). | Solid on iOS/Android; camera experimental. |
+| **Strava** *(beachhead)* | OAuth 2.0; `activity:read`; **webhook** for new activities; per-activity HR streams. Requires the broker. | **Solid API**, generous for read. Rate limits (per-app + per-15-min) → cache derived summaries. App registration required. |
+| **Oura** | OAuth 2.0 (or Personal Access Token for solo/dev); daily readiness/sleep/HRV. | Solid; PAT path enables a **local-only** early build (§11). |
+| **Whoop** | OAuth 2.0; recovery/strain/HRV/sleep; webhooks. | **Partner approval / access tier is the gating risk** — sequence Whoop *after* Strava + Oura. |
+| **Token broker backend** | **Cloudflare Workers** BFF: OAuth exchange/refresh (Secrets), encrypted refresh-token storage (KV/D1), per-user Durable Objects, Cron refresh, webhook receivers → returns derived summaries only. | **Solved without servers or a real DB.** Serverless edge; only persisted state is encrypted refresh tokens. See §11. |
+| **Persistence (device)** | `LocalStorageStore` → `IndexedDbStore` behind `CompanionStore`; dex is time-series, IndexedDB recommended once integrations stream daily data. | Trivial; no server DB for the dex. |
+| **Carried / portable** | Native app icon on the home screen *is* the portability story (the collectible steal), now with App Store legitimacy. | Solid. |
 
-**Net:** v1 is fully buildable on the current stack with no new backend state and no database. The only genuinely deferred piece is iOS-native biometric access, which the interface design quarantines.
+**Net:** the **universal core is fully local and buildable now**; the **integration layer needs the broker**, and **Whoop access approval** is the longest-lead external dependency.
 
-## 11. What we deliberately drop (anti-extraction, the wedge)
+## 11. The integration broker — Cloudflare Workers (the one backend)
 
-- **No mortality / neglect-guilt / nagging** (Tamagotchi's shadow) — replaced by rest + instant revival + monotonic growth.
-- **No gacha, pay-to-progress, or pull-rate monetization** (Pokémon's shadow) — growth is gated only on *your practice*.
-- **No blind boxes, manufactured scarcity, resale, or FOMO drops** (the collectible's shadow) — one companion, earned evolution, your data.
-- **No coercive streaks** — streaks are celebrated when present and silent when broken; never a loss screen.
+A **Cloudflare Worker** is the smallest thing that solves the OAuth/webhook problem without managing servers or a real database. It plays the **Backend-for-Frontend (BFF) token-broker** role: the app talks only to our Worker, never to providers directly; the Worker holds secrets, brokers tokens, ingests webhooks, and hands the device *derived summaries only*.
+
+**Cloudflare primitives → broker responsibilities:**
+
+| Need | Cloudflare primitive |
+|---|---|
+| Client secrets / signing keys | **Workers Secrets** (encrypted env, never shipped to the app). |
+| Refresh-token storage (the only persisted state) | **Workers KV** (simple) or **D1** (SQLite, if we want queryable per-user rows); values **encrypted at rest** with a key from Secrets. |
+| Per-user coordination, webhook fan-in, rate-limit counters | **Durable Objects** (one per user) — serializes token refresh and dedupes provider webhooks. |
+| Scheduled token refresh / Oura daily pull | **Cron Triggers**. |
+| Edge HTTP for OAuth callback + webhook receivers | The Worker `fetch` handler itself. |
+
+**Endpoints (Worker routes):** `/integrations/{provider}/start` → PKCE auth redirect; `/integrations/{provider}/callback` → code-for-token exchange, encrypt+store refresh token; `/integrations/{provider}/webhook` → signature-verified ingest → reduce to summary → push to device (or queue for next app open); `/integrations/{provider}/sync` → rate-limited pull. **Raw streams are reduced in the Worker and discarded; only summaries persist briefly / leave the edge.**
+
+**Dependency inversion holds:** the Worker is one concrete implementation of the `IntegrationBroker` interface (§6). The device app is broker-agnostic — point it at the Worker URL via config; a different host (or the `web.py` dev stub) swaps in without touching the engine, the dex, or the UI. `web.py` can host a **local dev broker** for fixture-based development so CI and offline work never touch Cloudflare.
+
+**Local-only fallback (if we defer the Worker):** T0 core + **Oura via user-pasted Personal Access Token** (no secret, no callback) + **Strava manual `.gpx` import**. Fully local, worse UX, no live webhooks — a stopgap, not the destination.
+
+### 11a. The common standard for these integrations
+
+What we describe above *is* the de-facto industry pattern for wearable/fitness OAuth APIs; documenting it so the team builds to a known shape:
+
+- **OAuth 2.0 Authorization Code + PKCE.** The standard for Strava, Oura, Whoop, Fitbit, Garmin, Google Fit. PKCE protects the code exchange even though a confidential client is used.
+- **Confidential client / BFF.** The `client_secret` lives **only** server-side (the Worker). The mobile/web app is treated as a public client and never holds the secret — the reason a backend is non-negotiable for these providers.
+- **Short-lived access token + long-lived refresh token**, refreshed server-side ahead of expiry; tokens **encrypted at rest**; least-privilege scopes (e.g. Strava `activity:read`).
+- **Webhooks for push, polling for pull.** Strava and Whoop push events (new activity / new data) to a registered, **signature-verified** webhook (Strava uses a subscription + verify-token handshake; verify HMAC signatures where provided). Oura is primarily **pull** (poll daily summaries on a cron), with PAT support for solo use.
+- **Rate-limit discipline.** Per-app and short-window limits (e.g. Strava's 15-minute + daily caps) → cache derived summaries, back off, and never fan a webhook into N synchronous fetches.
+- **Data-deletion obligations.** Each provider's ToS requires honoring user disconnect/deletion; one-tap **disconnect** revokes the token and purges stored state (§13).
+
+This is exactly the **token-broker / BFF-for-OAuth** pattern, and it is a clean extension of the same-origin server-to-server proxy `web.py` already runs for Bonsai (`/illustrate`, `/narrate`) — now pointed at OAuth providers from the edge.
 
 ## 12. Scope / non-goals (YAGNI)
 
-**In (v1):** single companion; guardianship-with-rest bond; deterministic coherence engine; `SimulatedSource` + `WebBluetoothHeartRateSource`; `LocalStorageStore`; canvas + Bonsai imaging; the C0–C6 PWA FSM; an initial 3-branch taxonomy as data; dex export + wipe.
-**Out (deferred behind seams):** iOS-native / dedicated object; real wearable/HealthKit integration; **cohort / social connection-as-completion** (Pokémon's social moat — a strong Phase-Future, but it needs a backend and is out of the no-DB v1); remote sync; multi-companion collecting; any monetization.
+**In (v1):** iOS-wrapped app; universal T0 core (HealthKit + Bluetooth + camera); deterministic engine; `LocalStorageStore`; canvas + Bonsai imaging; C0–C6 FSM; the 3-branch taxonomy as data; **Strava power-up via the broker** (beachhead); **Oura power-up**; dex export + wipe.
+**Out / deferred (behind seams):** **Whoop** (sequence after partner approval); dedicated object / Android GA; **Strava-graph social / connection-as-completion** (fast-follow — the beachhead makes it reachable, but it needs the broker hardened + a real backend); remote sync; multi-companion collecting; any monetization.
 
 ## 13. Safety, privacy & governance
 
-- **Local-first, like the clinical runtime.** "No biometric data leaves the device" is the covenant (mirrors "no patient data leaves the device"). Raw RR streams are processed in memory and **not persisted**; only derived per-session summaries enter the dex.
-- **Explicit consent** for camera and Bluetooth; clear "what we measure and why"; one-tap **export all** and **wipe** (`CompanionStore.exportAll` / `wipe`).
-- **Not a medical device.** No diagnosis, no arrhythmia labeling, no alarms, no advice. Coherence is framed as practice feedback. A visible non-clinical disclaimer, consistent with this repo's standard.
-- **Dignity guardrails** on all imagery (reuse `IMAGE_GUARDRAILS`): no fear, no gore, nothing body-shaming or medicalized.
-- **Accessibility / safety of paced breathing:** breath guide is optional, gentle, and skippable; never instructs breath-holding.
+- **Two data planes, clearly separated.** *Device plane* (HealthKit, live HR, the dex, the engine) is local — "no biometric data leaves the device," mirroring the clinical covenant. *Integration plane* (the broker) holds **only OAuth refresh tokens (encrypted) and reduces provider data to derived summaries server-side**, never persisting raw streams. Name this split explicitly to users.
+- **Least-privilege scopes** per provider (e.g., Strava `activity:read` only); transparent "what we read and why"; one-tap **disconnect** (revoke + delete tokens) and **export all / wipe** the dex.
+- **Provider ToS compliance** — honor Strava/Oura/Whoop rate limits, attribution, and data-deletion obligations; webhook auth verified.
+- **Not a medical device** — no diagnosis, no arrhythmia labeling, no alarms, no advice; coherence/recovery framed as practice feedback. Visible non-clinical disclaimer.
+- **Dignity guardrails** on imagery (reuse `IMAGE_GUARDRAILS`): no fear, no body-shaming, nothing medicalized.
+- **Anti-extraction, enforced:** no gacha, no pay-to-progress, no manufactured scarcity, no coercive streaks; power-ups add capability and never ration the core.
+- **Paced breathing** is optional, gentle, skippable; never instructs breath-holding.
 
 ## 14. Testing
 
-- **Unit (vitest, deterministic — the existing discipline):** `coherence.ts` on known RR series (flat vs resonant → expected scores); `engine.ts` mood transitions and `EvolveRule` gating; growth monotonicity (absence never regresses lifetime/level); `LocalStorageStore` round-trip + export/wipe; `CanvasImager` produces a frame offline.
-- **Source contract tests:** each `BiometricSource` honors `available()` / `start` / `stop`; `SimulatedSource` is reproducible from a seed.
-- **Integration:** a scripted session (`SimulatedSource` → engine → store) writes exactly one `DexEntry`, ticks vitality, and fires evolution at the boundary.
-- **Offline:** UI + server work with Bonsai down (canvas + no spinners).
-- **Optional Python proof:** mirror `coherence`/`engine` in `src/pdm/companion/` and extend `proof.py` with companion criteria if we want parity with the HOMER-1 proof harness.
+- **Unit (vitest, deterministic):** `coherence.ts`/`nourish.ts` on known series (flat vs resonant; a recovery score; an activity with HR recovery → expected nourishment); `engine.ts` transitions + `EvolveRule` gating incl. **hybrid stage** from stacked signals; growth monotonicity (absence never regresses); `LocalStorageStore` round-trip + export/wipe; `CanvasImager` offline frame.
+- **Source contracts:** every `SignalSource` honors `available()`/`capabilities`/lifecycle; `SimulatedSource` reproducible from a seed; integration adapters tested against **recorded provider fixtures** (no live calls in CI).
+- **Broker:** OAuth state/PKCE handling; refresh-token encryption round-trip; webhook signature verification; rate-limit backoff; raw→summary reduction discards raw.
+- **Integration:** scripted multi-signal sequence (sim coherence + fixture Strava activity + fixture Oura day) writes the right `DexEntry`s, ticks vitality, fires the hybrid evolution.
+- **Offline / partial:** UI works with no integrations and Bonsai down (T0 + canvas).
+- **Optional Python proof:** mirror engine in `src/pdm/companion/`, extend `proof.py` with companion criteria.
 
-## 15. Build order (phased; each phase is demoable)
+## 15. Build order (phased; each phase demoable)
 
-1. **Engine core.** `types.ts`, `coherence.ts`, `engine.ts`, `species.ts` (initial taxonomy) + vitest. Pure, no UI, no I/O. *Proves the math and the growth model.*
-2. **Persistence + dex.** `CompanionStore` interface + `LocalStorageStore`; growth/evolution wired to dex append. *Proves compounding, no DB.*
-3. **UI FSM.** `companion/store.svelte.ts` + C0–C6 Svelte states mirroring `app/src/lib/states/`; `CanvasImager` so it's alive offline. *First playable, simulated signal.*
-4. **Real biometrics + PWA.** `WebBluetoothHeartRateSource` (+ experimental `CameraPpgSource`); web manifest + service worker. *Real coherence; installable/carried.*
-5. **Bonsai imaging.** `BonsaiImager` via `/illustrate`; seed-locked lineage renders; the C5 evolution moment. *The creature is seen.*
-6. **Dex export + Atlas.** Export/wipe; C6 taxonomy surface; a shareable "bloom card" milestone image (the case-study-hero analogue). *The record + the world.*
-7. **(Future)** iOS/object `BiometricSource`; cohort/social connection-as-completion (needs backend); remote `CompanionStore`. *Behind the seams, untouched engine.*
+1. **Engine core.** `types/coherence/nourish/engine/species` + vitest. Pure, no UI, no I/O. *Proves math + growth + hybrid evolution.*
+2. **Device persistence + dex.** `CompanionStore` + `LocalStorageStore`; growth wired to dex. *Compounding, no server.*
+3. **UI FSM + universal core.** `companion/store.svelte.ts` + C0–C6 mirroring `app/src/lib/states/`; `SimulatedSource` + `CameraPpgSource`; `CanvasImager`. *First playable, web.*
+4. **iOS wrap + HealthKit.** Capacitor shell; `HealthKitSource` (live HR + recovery + workouts); App Store-ready core. *Real on-device signal, T0 complete.*
+5. **Broker + Strava power-up (beachhead).** `IntegrationBroker` in `web.py`; `StravaSource`; activities/HR-recovery/variety → Ember branch. *The wedge unlock.*
+6. **Oura power-up + Bonsai imaging.** `OuraSource` (recovery → Lumen); `BonsaiImager` seed-locked renders; C5 evolution moment; C6 Atlas. *Depth + the creature seen.*
+7. **Dex export + bloom card.** export/wipe; shareable milestone image (the case-study-hero analogue). *The record + first social seed.*
+8. **(Future)** Whoop (post-approval); Strava-graph social/connection-as-completion; dedicated object `SignalSource`; remote store. *Behind the seams.*
 
 ---
 
 ## Appendix — why this fits the existing workload
 
-Every novel concept here has a working ancestor in the repo, so the team builds with patterns it already trusts:
+Every novel concept has a working ancestor in the repo:
 
-- **Deterministic, testable scoring** → `coherence.ts` / `engine.ts` ≈ `runtime.py` + `recursive_validation`.
-- **Data-as-seam generativity** → `blueprint_species()` ≈ `factory.blueprint_specs()` (`origin="bonsai_proposed"` with deterministic fallback).
-- **Append-only, inspectable, DB-free memory** → `CompanionStore` ≈ `InstitutionalMemory` (JSONL).
-- **Offline-first adapters with `available()`** → `BiometricSource` / `CompanionImager` ≈ `BonsaiWriter` / `BonsaiImageStudio`.
-- **Emotion-driven discrete FSM UI** → C0–C6 ≈ the S0–S8 conference (`State` union + `EMOTION` map + persistent chrome).
+- **Deterministic, testable scoring** → `coherence.ts`/`nourish.ts`/`engine.ts` ≈ `runtime.py` + `recursive_validation`.
+- **Data-as-seam generativity** → `blueprint_species()` ≈ `factory.blueprint_specs()`.
+- **Append-only, inspectable, DB-free device memory** → `CompanionStore` ≈ `InstitutionalMemory` (JSONL).
+- **Offline-first adapters with `available()` / graceful capability** → `SignalSource` family + tiered power-ups ≈ `BonsaiWriter`/`BonsaiImageStudio` + the existing "degrade gracefully when a server is down" philosophy.
+- **Emotion-driven discrete FSM UI** → C0–C6 ≈ S0–S8 (`State` union + `EMOTION` map + chrome).
 - **On-device dignified imaging with canvas fallback** → companion renders ≈ the what-if spine, same proxy and guardrails.
-- **Local-only data covenant** → "no biometric data leaves the device" ≈ "no patient data leaves the device."
+- **Same-origin server-to-server proxy for CORS-less local services** → the `IntegrationBroker` extends the exact pattern `web.py` already uses for Bonsai (`/illustrate`, `/narrate`) to OAuth providers.
+- **Local-data covenant** → the device/integration two-plane split preserves "biometric data stays on the device" while quarantining the one place (refresh tokens) that genuinely cannot.
 
-The biometric companion is not a detour from this codebase's thesis — it is the same thesis (*feeling and intelligence should compound, locally and auditably*) pointed at a personal nervous-system practice instead of a hospital service line.
+The biometric companion is the repo's thesis — *feeling and intelligence should compound, locally and auditably* — pointed at a personal physiological practice, with Strava's multi-sport, app-connecting, socially-networked users as the first soil.
