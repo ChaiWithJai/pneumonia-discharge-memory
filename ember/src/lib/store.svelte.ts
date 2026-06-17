@@ -25,6 +25,7 @@ import type {
   WokenId,
 } from "./types";
 import { respond } from "./loops/companion";
+import { decideHeartbeat } from "./loops/heartbeat";
 import type { CompanionEvent } from "./loops/voice";
 import type { Trace } from "./loops/studio";
 import { CARE_RESOURCES } from "./loops/carepath";
@@ -83,6 +84,7 @@ class EmberApp {
   private store = new LocalStorageStore();
   private source: PassiveSource = new SimulatedSource(7);
   private traces: Trace[] = [];
+  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 
   now(): number {
     return Date.now() + this.clockOffsetMs;
@@ -113,32 +115,50 @@ class EmberApp {
       this.screen = "A1";
       return;
     }
-    const now = this.now();
-    this.lapseDays = Math.max(0, (now - loaded.country.lastTickAt) / DAY);
-
-    let country = { ...loaded.country };
-    // overnight pass for each whole day skipped (bounded), harvesting a dream
-    const daysSkipped = Math.min(7, Math.floor(this.lapseDays));
-    let harvest: string | undefined;
-    for (let i = 0; i < daysSkipped; i++) {
-      const r = overnightPass(country, loaded.woken.hearthkeeper.awake, now);
-      country = r.country;
-      if (r.harvest) harvest = r.harvest;
-    }
-    // tick to now (applies the Hush)
-    country = tick(country, now);
-
-    const next: EmberSave = { ...loaded, country };
-    this.commit(next);
-    this.harvest = harvest;
-
-    if (this.lapseDays >= 1.5) {
+    this.save = loaded;
+    const lapsed = this.applyHeartbeat(this.now());
+    if (lapsed) {
       this.speak("return");
       this.screen = "D2";
     } else {
       this.speak("daily");
       this.screen = "B1";
     }
+  }
+
+  /**
+   * LOOP 3 — apply the Heartbeat: due overnight passes + the tick (the Hush),
+   * committed. Updates the WORLD only; it never navigates or notifies on its own
+   * (Indistractable). Returns whether re-entry should be the Return.
+   */
+  private applyHeartbeat(now: number): boolean {
+    if (!this.save) return false;
+    const d = decideHeartbeat(this.save.country, now);
+    this.lapseDays = d.lapseDays;
+    let country = { ...this.save.country };
+    let harvest: string | undefined;
+    for (let i = 0; i < d.overnightDays; i++) {
+      const r = overnightPass(country, this.save.woken.hearthkeeper.awake, now);
+      country = r.country;
+      if (r.harvest) harvest = r.harvest;
+    }
+    country = tick(country, now);
+    this.commit({ ...this.save, country });
+    this.harvest = harvest;
+    return d.lapsed;
+  }
+
+  /** A gentle in-session pulse: keeps the world current. Never forces a screen. */
+  pulse(): void {
+    if (this.save) this.applyHeartbeat(this.now());
+  }
+  startHeartbeat(): void {
+    if (this.heartbeatTimer) return;
+    this.heartbeatTimer = setInterval(() => this.pulse(), 60_000);
+  }
+  stopHeartbeat(): void {
+    if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
+    this.heartbeatTimer = null;
   }
 
   private commit(next: EmberSave): void {
@@ -296,14 +316,10 @@ class EmberApp {
   // ---- dev time travel (System screen) ----
   advanceDays(days: number): void {
     this.clockOffsetMs += days * DAY;
-    if (this.save) {
-      const now = this.now();
-      this.lapseDays = Math.max(0, (now - this.save.country.lastTickAt) / DAY);
-      this.commit({ ...this.save, country: tick(this.save.country, now) });
-      if (this.lapseDays >= 1.5) {
-        this.speak("return");
-        this.go("D2");
-      }
+    const lapsed = this.applyHeartbeat(this.now());
+    if (lapsed) {
+      this.speak("return");
+      this.go("D2");
     }
   }
 

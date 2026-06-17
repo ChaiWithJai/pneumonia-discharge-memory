@@ -52,7 +52,18 @@
   const showNav = $derived(CORE.includes(ember.screen));
   const Current = $derived(SCREENS[ember.screen]);
 
-  onMount(() => ember.boot());
+  onMount(() => {
+    ember.boot();
+    ember.startHeartbeat(); // Loop 3 — ambient world-updates, never notifications
+    const onVis = () => {
+      if (document.visibilityState === "visible") ember.pulse();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      ember.stopHeartbeat();
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  });
 </script>
 
 <div class="frame" style="--accent:{accent};--ember:{accent}">
