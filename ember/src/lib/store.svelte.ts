@@ -44,7 +44,7 @@ export type Screen =
   | "D2" | "D3"
   | "E1" | "E2" | "E3"
   | "F1" | "F2" | "F3" | "F4"
-  | "carepath" | "studio";
+  | "checkin" | "carepath" | "studio";
 
 export interface Utterance {
   kind: "voice" | "care";

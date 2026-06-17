@@ -25,4 +25,5 @@
   <div class="spacer"></div>
   <button class="btn btn-primary btn-block" onclick={() => ember.go("B4")}>Tend</button>
   <button class="btn btn-block" onclick={() => ember.go("B3")}>What my living made today</button>
+  <button class="btn btn-ghost btn-block" onclick={() => ember.go("checkin")}>Tell the Witness yourself</button>
 </div>

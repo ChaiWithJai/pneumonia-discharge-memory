@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import type { Component } from "svelte";
+  import { fade } from "svelte/transition";
   import { ember } from "./lib/store.svelte";
   import type { Screen } from "./lib/store.svelte";
   import { temperament } from "./lib/engine/blueprint";
@@ -30,6 +31,7 @@
   import F2 from "./screens/F2.svelte";
   import F3 from "./screens/F3.svelte";
   import F4 from "./screens/F4.svelte";
+  import Checkin from "./screens/checkin.svelte";
   import Carepath from "./screens/carepath.svelte";
   import Studio from "./screens/studio.svelte";
 
@@ -40,6 +42,7 @@
     D2, D3,
     E1, E2, E3,
     F1, F2, F3, F4,
+    checkin: Checkin,
     carepath: Carepath,
     studio: Studio,
   };
@@ -67,6 +70,19 @@
 </script>
 
 <div class="frame" style="--accent:{accent};--ember:{accent}">
-  <Current />
+  {#key ember.screen}
+    <div class="screen-wrap" in:fade={{ duration: 260 }}>
+      <Current />
+    </div>
+  {/key}
   {#if showNav}<Nav />{/if}
 </div>
+
+<style>
+  .screen-wrap {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+</style>
