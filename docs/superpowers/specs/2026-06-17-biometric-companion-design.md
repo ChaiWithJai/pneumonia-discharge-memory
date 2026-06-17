@@ -1,7 +1,25 @@
-# Biometric Companion (Coherence Tamagotchi) — Design Spec
+# Ember — Product Direction & Architecture Spec
 
-- **Date:** 2026-06-17 (rev. 2 — adds iOS/HealthKit default, Whoop/Oura/Strava integrations, Strava beachhead, tiered power-ups)
-- **Status:** Draft (design); pending direction sign-off → implementation plan
+> **Now branded *Ember*.** The narrative canon lives in [`docs/EMBER_WORLD_BIBLE.md`](../../EMBER_WORLD_BIBLE.md); integration research lives in [`2026-06-17-integration-feasibility.md`](./2026-06-17-integration-feasibility.md). This spec is the technical/product translation of the bible. **Rev 3 is a partial update** — header, lexicon, and the research-driven changes below are reconciled; the deep rewrite (temperaments, the Circle/Woken collection, the Inner Country, the Hush, Seasons, the Commons) is **pending the open decisions in §16**, to avoid rewriting against unsettled direction.
+
+- **Date:** 2026-06-17 (rev. 3 — Ember rebrand; research-driven changes; open decisions pending)
+- **Status:** Draft (design); blocked on the open decisions in §16 before the full Ember reconciliation.
+
+### Ember lexicon → this spec's earlier terms
+| Ember term (canon) | Maps to / supersedes here |
+|---|---|
+| **your Ember** (the being you tend; can dim, never die) | "the companion"; the guardianship-with-rest bond is **confirmed and deepened** (the Hush = graceful rest; the ember always holds). |
+| **the Witness** (senses how you lived; never scores/judges) | the signal layer (`coherence`/`nourish`). **Reframe: no 0–100 verdict** — render signal as a living world, not a score. |
+| **Tending** (you live well; the Witness reflects light; never tap-to-feed) | the bond mechanic. |
+| **the Circle (1+3)** + **the Woken (6: Bellows, Hearthkeeper, Strider, Lamplighter, Kin, Wisp)** | **Supersedes the earlier "one companion, no collection."** The collection is now a *meaningful team woken by real practice* — not gacha, not creature-completism. The "dex of your states" persists as the record beneath it. |
+| **the four temperaments (Seer / Wright / Root / Ferry)** | the starter choice; **supersedes the earlier Tidewalker/Lumen/Ember species tree.** |
+| **the Inner Country**, **the Hush**, **Seasons** | the world/state model (was "moods + rest + growth"). |
+| **the Commons** | the social/retention layer (was deferred "connection-as-completion"). |
+
+### Research-driven changes folded in (see feasibility doc)
+- **The Witness has two tiers:** *live* coherence on-device via **camera-PPG / BLE strap** (HealthKit is **not** real-time), plus *passive* nourishment from **HealthKit / Oura / Whoop**.
+- **Strava is demoted** from beachhead to an optional later "movement" power-up: its 2026 terms forbid showing data to anyone but the owner (**kills the social-graph wedge**), ban AI/ML training, and add a paid tier. **Lead with Apple Health + Oura.**
+- **Sequencing:** universal core (no gate) → HealthKit → Cloudflare broker + Oura → Whoop (approval-gated, submit early) → Strava (optional) → Commons (Ember-native, never on Strava data).
 - **Scope:** A connected biometric companion that reuses this repo's engine patterns — generative blueprint seam, compounding append-only memory, offline-first adapters, a discrete emotion-driven state machine, and on-device Bonsai imaging. A single creature you *guard*: it blooms on your regulated nervous-system state and rests (never dies, never nags) when the signal is gone. Its growth is logged as a living **dex of your own states**, and it evolves along an **extensible species taxonomy**. **iOS-first via HealthKit**, with a **universal heart-data core that runs on any device** and **brand-specific power-ups** unlocked by connecting Whoop, Oura, and Strava. Every signal source is an adapter behind one interface, so capability degrades and upgrades gracefully and a future dedicated object binds to the same seam.
 - **Beachhead:** monthly-active **Strava** users who log several activity types (see §2).
 - **Non-clinical:** a wellbeing companion, not a medical device. HRV/coherence is practice feedback, never diagnosis.
@@ -231,4 +249,19 @@ Every novel concept has a working ancestor in the repo:
 - **Same-origin server-to-server proxy for CORS-less local services** → the `IntegrationBroker` extends the exact pattern `web.py` already uses for Bonsai (`/illustrate`, `/narrate`) to OAuth providers.
 - **Local-data covenant** → the device/integration two-plane split preserves "biometric data stays on the device" while quarantining the one place (refresh tokens) that genuinely cannot.
 
-The biometric companion is the repo's thesis — *feeling and intelligence should compound, locally and auditably* — pointed at a personal physiological practice, with Strava's multi-sport, app-connecting, socially-networked users as the first soil.
+Ember is the repo's thesis — *feeling and intelligence should compound, locally and auditably* — pointed at a personal interior practice: a being bonded to how you actually are, that grows by your living and survives by a promise.
+
+---
+
+## 16. Open decisions (blocking the full Ember reconciliation)
+
+From the world bible plus the integration research. The deep rewrite waits on these.
+
+1. **Name** — *Ember* (recommended) vs Tend / Kindling / Hearth. Decides the whole lexicon.
+2. **Hardware / signal stance for v1** — phone-only universal core (camera-PPG) with *ingest-what-you-own* wearables, vs Apple-Health-first, vs a dedicated object later.
+3. **Strava** — demote to an optional owner-only "movement" power-up (recommended), or drop for v1, or keep as beachhead despite the 2026 ToS.
+4. **The Commons (social) timing** — v2 / prove the solo soul first (recommended) vs v1.
+5. **Whoop** — begin the ≤10-user build + submit approval now (parallel, off critical path), or defer entirely.
+6. **MVP starter temperament** — Root or Seer (the treatment's two candidates for "most universal").
+
+See the live-latency, Apple-Watch-assumption, and verify-before-code items in the feasibility doc §8.
