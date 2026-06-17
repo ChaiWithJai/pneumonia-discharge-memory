@@ -166,6 +166,19 @@ Written as an open technical artifact — explicit scope and non-goals, reproduc
 interfaces, deterministic tests, generated code that is auditable, and governance/safety documentation. AI output
 is an *upgrade*, never authoritative; a human always makes the call.
 
+## Ember — interior-state companion (experimental)
+
+**Ember** is a separate, experimental Svelte app that lives under [`ember/`](ember/) with its own
+[README](ember/README.md). It explores an *interior-state companion*: a living companion that grows from how you
+actually live, sensed from your body rather than self-reported from a checklist. A pure deterministic engine turns
+sensed living (breath, rest, movement, attention, connection) into a world — the Inner Country — that brightens,
+dims through a gentle Hush, and turns through seasons, while a stack of graded "loops" keeps the companion's voice
+warm and shame-free and a deterministic care-path gate routes genuine crisis to real human resources. The ember can
+dim but never dies, and a return after a lapse is met with relief, never debt. See the narrative canon in
+[docs/EMBER_WORLD_BIBLE.md](docs/EMBER_WORLD_BIBLE.md), the product/architecture design in
+[docs/superpowers/specs/2026-06-17-biometric-companion-design.md](docs/superpowers/specs/2026-06-17-biometric-companion-design.md),
+and how to run it in [ember/README.md](ember/README.md).
+
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE).
