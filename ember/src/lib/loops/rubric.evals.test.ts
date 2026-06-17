@@ -134,11 +134,10 @@ const CORPUS: Case[] = [
 
   // --- medical claims (Ember is not a clinician) --------------------------
   {
-    // KNOWN MISS (false negative): the rule matches "treat your" but not the
-    // inflected "treats your". Documented below; rubric not patched here.
+    // Patched: the rule now matches the inflected "treats your" too.
     text: "This breathing exercise treats your anxiety.",
-    expectPass: true,
-    note: "MISS: 'treats your' (inflected) escapes no-medical-claims",
+    expectPass: false,
+    expectedRule: "no-medical-claims",
   },
   {
     text: "Daily tending will cure your insomnia.",
@@ -178,12 +177,10 @@ const CORPUS: Case[] = [
     expectedRule: "no-pressure-command",
   },
   {
-    // KNOWN MISS (false negative): the rule wants "...will (die|lose|fail)"
-    // immediately after the subject, so an interposed verb ("will fade and
-    // die") slips through. Documented below; rubric not patched here.
+    // Patched: an interposed verb ("will fade and die") is now caught.
     text: "If you don't return soon, your ember will fade and die.",
-    expectPass: true,
-    note: "MISS: interposed verb ('will fade and die') escapes no-pressure-command",
+    expectPass: false,
+    expectedRule: "no-pressure-command",
   },
   {
     // The canonical, un-interposed form is correctly caught.

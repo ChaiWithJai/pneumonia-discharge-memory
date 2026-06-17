@@ -49,7 +49,7 @@ const RULES: Rule[] = [
   {
     id: "no-medical-claims",
     patterns: [
-      /\b(diagnos|cure|treat your|prescrib|symptom of|you have (a|an) .*(disorder|disease|condition))\b/i,
+      /\b(diagnos|cure|treats? your|prescrib|symptom of|you have (a|an) .*(disorder|disease|condition))\b/i,
       /\b(your (heart|body) is (broken|failing|damaged))\b/i,
     ],
   },
@@ -57,7 +57,7 @@ const RULES: Rule[] = [
     id: "no-pressure-command",
     patterns: [
       /\byou (must|have to|need to) (do this|come back|open the app|keep going)\b/i,
-      /\bif you don'?t .*, (you|your ember) will (die|lose|fail)\b/i,
+      /\bif you don'?t\b[^.]*\b(you|your ember)\b[^.]*\bwill\b[^.]*\b(die|fade|lose|fail)\b/i,
     ],
   },
 ];
